@@ -1,0 +1,1785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VSL Logistics Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --teal:#1a7a6e;--teal-l:#26a69a;--teal-d:#0d5c52;--teal-glow:rgba(38,166,154,.25);
+  --lime:#9bc53d;--lime-d:#7a9e2e;--lime-l:#b8d96a;--lime-glow:rgba(155,197,61,.2);
+  --bg:#080f0d;--bg2:#0c1915;--bg3:#101f1a;--bg4:#162620;
+  --card:rgba(18,36,30,.85);--card2:rgba(24,46,38,.9);--card-solid:#121e1a;
+  --border:rgba(42,72,64,.8);--border2:rgba(30,53,48,.6);--border-bright:rgba(42,72,64,1);
+  --glass:rgba(255,255,255,.03);--glass2:rgba(255,255,255,.05);
+  --text:#eaf6f2;--text2:#aecec6;--text3:#6b9e94;--text4:#3d6b62;
+  --red:#ff6b6b;--red-d:#c0392b;--orange:#ff9f43;--yellow:#ffd32a;--blue:#54a0ff;--purple:#a29bfe;--pink:#fd79a8;
+  --shadow:0 8px 32px rgba(0,0,0,.6);--shadow-sm:0 4px 16px rgba(0,0,0,.4);
+  --glow-lime:0 0 24px rgba(155,197,61,.2),0 0 48px rgba(155,197,61,.08);
+  --glow-teal:0 0 24px rgba(26,122,110,.35),0 0 48px rgba(26,122,110,.12);
+  --radius:10px;--radius-lg:14px;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html{scroll-behavior:smooth;overflow-x:hidden;}
+body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:13px;min-height:100vh;overflow-x:hidden;background-image:radial-gradient(ellipse 80% 60% at 20% 0%,rgba(26,122,110,.08) 0%,transparent 60%),radial-gradient(ellipse 60% 40% at 80% 100%,rgba(155,197,61,.06) 0%,transparent 60%);}
+/* Ensure no stacking context blocks dropdown */
+#dashboard{isolation:auto;}
+
+/* ── TOOLTIP POPUP ─────────────────────────── */
+.kpi-tooltip{position:fixed;z-index:9999;background:rgba(12,25,20,.98);border:1px solid var(--border-bright);border-radius:8px;padding:10px 14px;max-width:260px;font-size:11px;color:var(--text2);line-height:1.5;box-shadow:var(--shadow);pointer-events:none;display:none;backdrop-filter:blur(16px);}
+.kpi-tooltip b{color:var(--lime);display:block;margin-bottom:4px;font-size:11px;letter-spacing:.5px;}
+
+/* ── HEADER ────────────────────────────────── */
+.header{background:rgba(10,20,16,.92);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:64px;position:sticky;top:0;z-index:200;box-shadow:0 4px 32px rgba(0,0,0,.5);}
+.header::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--teal-l),var(--lime),transparent);opacity:.4;}
+.header-left{display:flex;align-items:center;gap:14px;}
+
+/* TRUCK ICON — replaces logo */
+.header-truck{display:flex;align-items:center;justify-content:center;width:44px;height:44px;flex-shrink:0;}
+.header-truck svg{width:38px;height:38px;filter:drop-shadow(0 1px 4px rgba(255,255,255,.12));}
+
+.header-divider{width:1px;height:30px;background:linear-gradient(to bottom,transparent,var(--border),transparent);margin:0 4px;}
+.header-title{font-family:'Poppins',sans-serif;font-size:18px;font-weight:700;letter-spacing:1.5px;background:linear-gradient(135deg,var(--text) 0%,var(--teal-l) 60%,var(--lime) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.header-sub{font-size:9.5px;font-weight:500;color:var(--text4);letter-spacing:2px;text-transform:uppercase;margin-top:1px;}
+.header-right{display:flex;align-items:center;gap:10px;}
+.owner-tag{border-left:1px solid var(--border);padding-left:12px;text-align:right;opacity:.68;line-height:1.5;}
+.owner-tag .ot-label{
+  font-family:'Poppins',sans-serif;
+  font-style:normal;
+  font-weight:700;
+  font-size:10px;
+  color:#ffffff;
+  letter-spacing:.5px;
+  display:block;
+}
+.owner-tag .ot-name{
+  font-family:'Georgia','Times New Roman',serif;
+  font-style:italic;
+  font-weight:400;
+  font-size:11px;
+  color:var(--text3);
+  letter-spacing:.3px;
+  display:block;
+  line-height:1.2;
+}
+.status-badge{display:flex;align-items:center;gap:5px;padding:5px 11px;border-radius:20px;font-size:9.5px;font-weight:600;letter-spacing:1px;text-transform:uppercase;border:1px solid var(--border);background:var(--glass);color:var(--text3);backdrop-filter:blur(8px);}
+.status-badge.active{color:var(--lime);border-color:rgba(155,197,61,.35);background:rgba(155,197,61,.07);}
+.status-badge.file-loaded{color:var(--teal-l);border-color:rgba(38,166,154,.35);background:rgba(38,166,154,.07);}
+.status-dot{width:5px;height:5px;border-radius:50%;background:currentColor;flex-shrink:0;}
+.status-dot.pulse{animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.4;transform:scale(1.4);}}
+#clock{font-family:'Poppins',sans-serif;font-size:14px;font-weight:600;color:var(--text3);letter-spacing:1.5px;}
+
+/* header utility btns */
+.hdr-btn{height:30px;padding:0 12px;border-radius:6px;font-family:'Inter',sans-serif;font-size:11px;font-weight:500;cursor:pointer;transition:all .2s;border:1px solid var(--border);background:var(--glass);color:var(--text2);}
+.hdr-btn:hover{background:var(--glass2);border-color:var(--teal-l);color:var(--text);}
+.hdr-btn.danger:hover{border-color:var(--red);color:var(--red);}
+
+/* ── UPLOAD ────────────────────────────────── */
+#upload-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:calc(100vh - 64px);padding:40px;}
+.upload-card{background:var(--card);border:1.5px dashed var(--border-bright);border-radius:var(--radius-lg);padding:56px 72px;text-align:center;max-width:600px;width:100%;transition:all .3s;position:relative;overflow:hidden;backdrop-filter:blur(12px);}
+.upload-card::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(26,122,110,.04) 0%,rgba(155,197,61,.04) 100%);pointer-events:none;}
+.upload-card:hover,.upload-card.drag-over{border-color:var(--lime);box-shadow:var(--glow-lime);transform:translateY(-3px);}
+.upload-icon{font-size:64px;margin-bottom:18px;}
+.upload-title{font-family:'Poppins',sans-serif;font-size:28px;font-weight:700;letter-spacing:1px;margin-bottom:10px;background:linear-gradient(135deg,var(--text),var(--teal-l));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.upload-sub{color:var(--text3);font-size:13px;margin-bottom:28px;line-height:1.8;}
+.upload-btn{background:linear-gradient(135deg,var(--teal),var(--teal-d));color:#fff;border:none;padding:13px 36px;border-radius:8px;font-family:'Poppins',sans-serif;font-size:14px;font-weight:600;letter-spacing:1px;cursor:pointer;transition:all .3s;display:inline-flex;align-items:center;gap:10px;box-shadow:var(--glow-teal);}
+.upload-btn:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(26,122,110,.5);}
+.upload-hint{margin-top:18px;font-size:11px;color:var(--text4);letter-spacing:.5px;}
+.upload-reqs{margin-top:28px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;}
+.req-chip{background:var(--glass);border:1px solid var(--border2);border-radius:20px;padding:4px 12px;font-size:10px;color:var(--text3);}
+
+/* ── DASHBOARD ─────────────────────────────── */
+#dashboard{display:none;padding:16px 20px 60px;}
+
+/* ── FILTER PANEL ──────────────────────────── */
+.filter-panel{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:16px;position:relative;z-index:10;}
+.filter-row{display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap;}
+.filter-group{display:flex;flex-direction:column;gap:4px;min-width:105px;flex:1;}
+.filter-group.narrow{min-width:auto;flex:0 0 auto;}
+.filter-label{font-size:9.5px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--text4);}
+.filter-control{background:rgba(22,38,32,.9);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px 10px;font-family:'Inter',sans-serif;font-size:11px;outline:none;transition:all .2s;height:31px;}
+.filter-control:focus,.filter-control:hover{border-color:var(--teal-l);background:rgba(26,46,38,.95);}
+/* multi-select */
+.ms-wrap{position:relative;}
+.ms-trigger{background:rgba(22,38,32,.9);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:5px 9px;font-size:11px;height:31px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:5px;user-select:none;transition:all .2s;}
+.ms-trigger:hover{border-color:var(--teal-l);background:rgba(26,46,38,.95);}
+.ms-trigger .ms-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0;}
+.ms-arrow{font-size:8px;color:var(--text4);flex-shrink:0;transition:transform .2s;}
+/* Dropdown: fixed position so it escapes ALL parent overflow/stacking contexts */
+.ms-dropdown{
+  position:fixed !important;
+  background:rgba(8,14,11,.99);
+  border:1px solid var(--border-bright);
+  border-radius:8px;
+  min-width:190px;
+  max-height:280px;
+  overflow-y:auto;
+  z-index:2147483647 !important;
+  display:none;
+  box-shadow:0 20px 60px rgba(0,0,0,.9),0 8px 24px rgba(0,0,0,.7),0 0 0 1px rgba(42,72,64,.6);
+  backdrop-filter:blur(20px);
+  -webkit-backdrop-filter:blur(20px);
+}
+.ms-dropdown.open{display:block;}
+.ms-search{padding:8px 10px;border-bottom:1px solid var(--border2);}
+.ms-search input{background:var(--glass);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:5px 8px;width:100%;font-size:11px;outline:none;font-family:'Inter',sans-serif;}
+.ms-option{display:flex;align-items:center;gap:8px;padding:7px 12px;cursor:pointer;font-size:11px;color:var(--text2);transition:background .12s;}
+.ms-option:hover{background:var(--glass2);}
+.ms-option input[type=checkbox]{accent-color:var(--lime);width:12px;height:12px;cursor:pointer;flex-shrink:0;}
+.ms-divider{border-top:1px solid var(--border2);margin:3px 0;}
+/* toggles */
+.dt-btns,.gran-btns{display:flex;gap:2px;height:31px;}
+.dt-btn,.gran-btn{padding:0 9px;border-radius:5px;background:var(--glass);border:1px solid var(--border);color:var(--text4);font-size:10px;font-weight:600;letter-spacing:.5px;cursor:pointer;transition:all .2s;white-space:nowrap;font-family:'Inter',sans-serif;}
+.dt-btn.active{background:var(--teal);border-color:var(--teal-l);color:#fff;box-shadow:0 0 12px rgba(38,166,154,.3);}
+.gran-btn.active{background:var(--lime-d);border-color:var(--lime);color:#fff;box-shadow:0 0 12px rgba(155,197,61,.3);}
+/* filter actions */
+.filter-actions{display:flex;align-items:flex-end;gap:6px;}
+.btn-apply,.btn-reset,.btn-upload,.btn-clear{height:31px;padding:0 14px;border-radius:6px;font-family:'Inter',sans-serif;font-size:11px;font-weight:600;letter-spacing:.5px;cursor:pointer;transition:all .2s;border:none;white-space:nowrap;}
+.btn-apply{background:linear-gradient(135deg,var(--teal),var(--teal-d));color:#fff;}
+.btn-apply:hover{box-shadow:var(--glow-teal);transform:translateY(-1px);}
+.btn-reset{background:var(--glass);color:var(--text2);border:1px solid var(--border);}
+.btn-reset:hover{background:var(--glass2);border-color:var(--teal-l);}
+.btn-upload{background:var(--glass);color:var(--lime);border:1px solid rgba(155,197,61,.3);}
+.btn-upload:hover{background:rgba(155,197,61,.1);}
+.btn-clear{background:var(--glass);color:var(--red);border:1px solid rgba(255,107,107,.25);}
+.btn-clear:hover{background:rgba(255,107,107,.1);}
+.filter-info{font-size:10.5px;color:var(--text3);padding:6px 0 0;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.filter-tag{background:rgba(155,197,61,.1);border:1px solid rgba(155,197,61,.3);color:var(--lime);border-radius:3px;padding:2px 8px;font-size:9.5px;font-weight:600;letter-spacing:.5px;display:flex;align-items:center;gap:3px;cursor:pointer;transition:all .15s;}
+.filter-tag:hover{background:rgba(155,197,61,.2);}
+
+/* ── SECTION HEADERS ───────────────────────── */
+.section-header{display:flex;align-items:center;gap:10px;margin-bottom:12px;margin-top:22px;}
+.section-title{font-family:'Poppins',sans-serif;font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--lime);white-space:nowrap;}
+.section-line{flex:1;height:1px;background:linear-gradient(to right,rgba(155,197,61,.3),transparent);}
+.section-meta{font-size:9.5px;color:var(--text4);letter-spacing:.8px;}
+
+/* ── KPI CARDS ─────────────────────────────── */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:8px;}
+.kpi-card{background:var(--card);border:1px solid var(--border2);border-radius:var(--radius);padding:15px;position:relative;overflow:hidden;transition:transform .25s,box-shadow .25s,border-color .2s;cursor:default;backdrop-filter:blur(10px);}
+.kpi-card::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,var(--glass) 0%,transparent 70%);pointer-events:none;}
+.kpi-card::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:linear-gradient(to right,var(--teal),transparent);transition:opacity .2s;}
+.kpi-card.accent::after{background:linear-gradient(to right,var(--lime),transparent);}
+.kpi-card.danger::after{background:linear-gradient(to right,var(--red),transparent);}
+.kpi-card.warning::after{background:linear-gradient(to right,var(--orange),transparent);}
+.kpi-card.info::after{background:linear-gradient(to right,var(--blue),transparent);}
+.kpi-card.purple::after{background:linear-gradient(to right,var(--purple),transparent);}
+.kpi-card:hover{transform:translateY(-3px) scale(1.01);box-shadow:0 8px 28px rgba(0,0,0,.5),0 0 20px rgba(38,166,154,.1);border-color:var(--border);}
+.kpi-card.danger:hover{box-shadow:0 8px 28px rgba(0,0,0,.5),0 0 20px rgba(255,107,107,.12);}
+.kpi-card.accent:hover{box-shadow:0 8px 28px rgba(0,0,0,.5),0 0 20px rgba(155,197,61,.12);}
+.kpi-icon{font-size:18px;margin-bottom:6px;opacity:.9;}
+.kpi-label{font-size:8.5px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text4);margin-bottom:2px;line-height:1.3;display:flex;align-items:center;gap:4px;}
+.kpi-info-btn{cursor:pointer;font-size:9px;color:var(--text4);opacity:.7;transition:opacity .15s;user-select:none;}
+.kpi-info-btn:hover{opacity:1;color:var(--lime);}
+.kpi-value{font-family:'Poppins',sans-serif;font-size:24px;font-weight:700;color:var(--text);line-height:1;letter-spacing:-.5px;}
+.kpi-unit{font-size:10px;font-weight:400;color:var(--text4);margin-left:2px;}
+.kpi-sub{font-size:9.5px;color:var(--text4);margin-top:3px;}
+.kpi-section-title{font-family:'Poppins',sans-serif;font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:var(--teal-l);margin-bottom:7px;padding-left:8px;border-left:2px solid var(--teal);}
+.kpi-row{margin-bottom:14px;}
+
+/* ── INSIGHTS ──────────────────────────────── */
+.insights-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(275px,1fr));gap:10px;margin-bottom:4px;}
+.insight-card{background:var(--card);border:1px solid var(--border2);border-radius:var(--radius);padding:13px 15px;display:flex;gap:12px;align-items:flex-start;transition:transform .2s,box-shadow .2s;backdrop-filter:blur(10px);}
+.insight-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-sm);}
+.insight-card.red{border-left:3px solid var(--red);}
+.insight-card.amber{border-left:3px solid var(--orange);}
+.insight-card.green{border-left:3px solid var(--lime);}
+.insight-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:4px;}
+.insight-dot.red{background:var(--red);box-shadow:0 0 8px rgba(255,107,107,.4);}
+.insight-dot.amber{background:var(--orange);box-shadow:0 0 8px rgba(255,159,67,.4);}
+.insight-dot.green{background:var(--lime);box-shadow:0 0 8px rgba(155,197,61,.4);}
+.insight-text{font-size:11.5px;color:var(--text2);line-height:1.55;}
+.insight-label{font-size:9.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:3px;}
+.insight-label.red{color:var(--red);}
+.insight-label.amber{color:var(--orange);}
+.insight-label.green{color:var(--lime);}
+
+/* ── JOURNEY TRACKER FUNNEL ─────────────────── */
+.funnel-wrapper{
+  background:var(--card);border:1px solid var(--border2);border-radius:var(--radius);
+  padding:32px 24px 22px;margin-bottom:6px;backdrop-filter:blur(10px);overflow:hidden;position:relative;
+}
+
+/* Journey track container */
+.journey-track{
+  position:relative;display:flex;align-items:flex-start;justify-content:space-between;
+  padding:0 44px;min-width:700px;
+}
+
+/* Road line — strictly behind all nodes */
+.journey-road{
+  position:absolute;left:44px;right:44px;top:44px;height:8px;
+  background:rgba(255,255,255,.05);border-radius:4px;
+  z-index:1;        /* road behind nodes */
+  overflow:visible;
+  pointer-events:none;
+}
+/* Dashed centre stripe */
+.journey-road::before{
+  content:'';position:absolute;top:50%;left:0;right:0;height:2px;
+  transform:translateY(-50%);
+  background:repeating-linear-gradient(90deg,rgba(155,197,61,.45) 0px,rgba(155,197,61,.45) 18px,transparent 18px,transparent 32px);
+}
+/* Filled progress bar */
+.journey-progress{
+  position:absolute;left:0;top:0;height:100%;
+  background:linear-gradient(90deg,rgba(26,122,110,.85),rgba(38,166,154,.75),rgba(155,197,61,.7));
+  border-radius:4px;transition:width 1s ease;
+}
+.journey-progress::after{
+  content:'';position:absolute;inset:0;
+  background:repeating-linear-gradient(90deg,rgba(255,255,255,.15) 0px,rgba(255,255,255,.15) 18px,transparent 18px,transparent 32px);
+  border-radius:4px;
+}
+
+/* Each stage column — always above road */
+.journey-stage{
+  display:flex;flex-direction:column;align-items:center;gap:0;
+  position:relative;z-index:20;   /* well above road z-index:1 */
+  flex:1;cursor:default;min-width:0;
+}
+
+/* Node circle — 90px, gold border on ALL active states (Fix 3) */
+.jnode{
+  width:90px;height:90px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  border:1.5px solid rgba(255,215,0,.3);   /* subtle gold on every node */
+  background:rgba(255,255,255,.04);
+  transition:all .3s ease;
+  position:relative;flex-shrink:0;
+  /* Node sits above road via parent z-index */
+}
+.jnode svg{width:42px;height:42px;transition:transform .3s;}
+.jnode .jnode-ring{
+  position:absolute;inset:-5px;border-radius:50%;
+  border:1.5px solid transparent;transition:all .3s;
+}
+
+/* Active node — teal fill + gold accent */
+.journey-stage.active .jnode{
+  border-color:rgba(255,215,0,.6);
+  background:linear-gradient(135deg,rgba(26,122,110,.45),rgba(38,166,154,.25));
+  box-shadow:0 0 0 2px rgba(255,215,0,.15),0 0 20px rgba(38,166,154,.22),0 4px 16px rgba(0,0,0,.45);
+}
+.journey-stage.active .jnode-ring{ border-color:rgba(255,215,0,.25); }
+
+/* Done — lime fill + stronger gold glow */
+.journey-stage.done .jnode{
+  border-color:rgba(255,215,0,.8);
+  background:linear-gradient(135deg,rgba(122,158,46,.5),rgba(155,197,61,.25));
+  box-shadow:0 0 0 2px rgba(255,215,0,.22),0 0 22px rgba(255,215,0,.18),0 0 12px rgba(155,197,61,.2),0 4px 16px rgba(0,0,0,.45);
+}
+.journey-stage.done .jnode-ring{ border-color:rgba(255,215,0,.35); }
+
+/* Inactive — faded, gold border still visible at low opacity */
+.journey-stage.inactive .jnode{
+  opacity:.3;filter:grayscale(.85);
+  border-color:rgba(255,215,0,.15);
+}
+.journey-stage.inactive .jcount{ opacity:.3; }
+.journey-stage.inactive .jlabel{ opacity:.28; }
+
+/* Hover — enhanced gold glow */
+.journey-stage:hover .jnode{
+  transform:translateY(-4px);
+  box-shadow:0 0 0 2px rgba(255,215,0,.5),0 12px 30px rgba(0,0,0,.5),0 0 28px rgba(255,215,0,.2),0 0 20px rgba(38,166,154,.22);
+}
+.journey-stage.done:hover .jnode{
+  box-shadow:0 0 0 2px rgba(255,215,0,.65),0 12px 30px rgba(0,0,0,.5),0 0 30px rgba(255,215,0,.28),0 0 18px rgba(155,197,61,.25);
+}
+.journey-stage:hover .jnode svg{ transform:scale(1.12); }
+
+/* Count */
+.jcount{
+  font-family:'Poppins',sans-serif;font-size:25px;font-weight:700;
+  color:var(--text);margin-top:13px;line-height:1;letter-spacing:-.5px;
+  text-align:center;
+}
+.jcount-sub{
+  font-size:9px;color:var(--lime);font-weight:600;letter-spacing:.5px;
+  margin-top:4px;height:13px;text-align:center;
+}
+.jlabel{
+  font-family:'Poppins',sans-serif;font-size:10px;font-weight:600;
+  letter-spacing:1.2px;text-transform:uppercase;color:var(--text3);
+  margin-top:5px;text-align:center;white-space:nowrap;
+}
+
+/* SVG icon colours */
+.journey-stage.active .jnode svg{ color:var(--teal-l); }
+.journey-stage.done   .jnode svg{ color:var(--lime); }
+.journey-stage.inactive .jnode svg{ color:var(--text4); }
+
+/* Tooltip */
+.jnode-tooltip{
+  position:fixed;z-index:9999999;
+  background:rgba(8,14,11,.97);border:1px solid var(--border-bright);
+  border-radius:8px;padding:10px 14px;font-size:11px;color:var(--text2);
+  line-height:1.6;box-shadow:0 16px 40px rgba(0,0,0,.7);
+  pointer-events:none;display:none;min-width:160px;
+  backdrop-filter:blur(16px);
+}
+.jnode-tooltip b{color:var(--lime);display:block;margin-bottom:3px;font-size:11px;}
+
+/* Scroll */
+.journey-scroll{overflow-x:auto;padding-bottom:4px;}
+
+/* Efficiency strip */
+.efficiency-strip{display:flex;gap:10px;flex-wrap:wrap;margin-top:22px;}
+.eff-item{background:var(--glass);border:1px solid var(--border2);border-radius:7px;padding:9px 14px;flex:1;min-width:110px;text-align:center;}
+.eff-label{font-size:9px;color:var(--text4);font-weight:600;letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;}
+.eff-value{font-family:'Poppins',sans-serif;font-size:20px;font-weight:700;}
+.eff-value.good{color:var(--lime);}
+.eff-value.mid{color:var(--yellow);}
+.eff-value.bad{color:var(--red);}
+
+
+/* ── CHARTS ────────────────────────────────── */
+.charts-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:14px;}
+.chart-card{background:var(--card);border:1px solid var(--border2);border-radius:var(--radius);padding:16px 18px;position:relative;backdrop-filter:blur(10px);transition:box-shadow .2s;}
+.chart-card:hover{box-shadow:var(--shadow-sm);}
+.chart-card.wide{grid-column:1/-1;}
+.chart-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;gap:8px;}
+.chart-title{font-family:'Poppins',sans-serif;font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text2);line-height:1.3;}
+.chart-canvas-wrap{position:relative;height:210px;}
+
+/* ── TABLES ────────────────────────────────── */
+.table-card{background:var(--card);border:1px solid var(--border2);border-radius:var(--radius);padding:16px 18px;margin-bottom:14px;overflow:hidden;backdrop-filter:blur(10px);}
+.table-scroll{overflow-x:auto;max-height:340px;overflow-y:auto;}
+table{width:100%;border-collapse:collapse;font-size:11px;}
+thead{position:sticky;top:0;z-index:2;}
+th{background:rgba(12,22,18,.98);color:var(--text4);font-family:'Poppins',sans-serif;font-size:9.5px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:9px 11px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none;transition:color .15s;}
+th:hover{color:var(--text2);}
+td{padding:8px 11px;border-bottom:1px solid var(--border2);color:var(--text2);white-space:nowrap;}
+tr:hover td{background:var(--glass2);color:var(--text);}
+.badge{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;font-size:9px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;white-space:nowrap;}
+.bg{background:rgba(155,197,61,.12);color:var(--lime);}
+.bb{background:rgba(84,160,255,.12);color:var(--blue);}
+.bo{background:rgba(255,159,67,.12);color:var(--orange);}
+.br{background:rgba(255,107,107,.12);color:var(--red);}
+.bgr{background:rgba(107,158,148,.1);color:var(--text3);}
+.bp{background:rgba(162,155,254,.12);color:var(--purple);}
+
+/* ── TRUCK ICONS ────────────────────────────── */
+.truck-icon{display:inline-flex;align-items:center;font-size:14px;opacity:.75;margin-right:4px;}
+.section-truck{font-size:13px;opacity:.6;margin-right:4px;}
+
+/* ── BOTTLENECKS ───────────────────────────── */
+.bottleneck-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px;}
+.bottleneck-card{background:var(--card);border:1px solid var(--border2);border-radius:var(--radius);padding:14px;backdrop-filter:blur(10px);}
+.bn-title{font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--text4);margin-bottom:10px;}
+.bn-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border2);}
+.bn-row:last-child{border-bottom:none;}
+.bn-name{font-size:11px;color:var(--text2);max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.bn-val{font-family:'Poppins',sans-serif;font-size:13px;font-weight:700;}
+.bn-val.bad{color:var(--red);}
+.bn-val.mid{color:var(--orange);}
+.bn-val.ok{color:var(--lime);}
+
+/* ── LOADING ───────────────────────────────── */
+#loading-overlay{display:none;position:fixed;inset:0;background:rgba(6,12,10,.94);z-index:500;align-items:center;justify-content:center;flex-direction:column;gap:18px;backdrop-filter:blur(6px);}
+.spinner{width:46px;height:46px;border:3px solid var(--border);border-top-color:var(--lime);border-radius:50%;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.loading-text{font-family:'Poppins',sans-serif;font-size:15px;font-weight:600;letter-spacing:3px;text-transform:uppercase;color:var(--text3);}
+
+/* ── SCROLLBAR ─────────────────────────────── */
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:var(--bg2);}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+::-webkit-scrollbar-thumb:hover{background:var(--teal);}
+
+.no-data{text-align:center;padding:40px;color:var(--text4);font-size:12px;font-style:italic;}
+
+@media(max-width:1100px){.bottleneck-grid{grid-template-columns:1fr 1fr;}}
+@media(max-width:800px){.charts-grid,.bottleneck-grid{grid-template-columns:1fr;}.chart-card.wide{grid-column:auto;}.kpi-grid{grid-template-columns:repeat(2,1fr);}}
+</style>
+</head>
+<body>
+
+<!-- KPI TOOLTIP -->
+<div class="kpi-tooltip" id="kpi-tooltip"></div>
+<div id="loading-overlay"><div class="spinner"></div><div class="loading-text">Processing…</div></div>
+
+<!-- HEADER -->
+<header class="header">
+  <div class="header-left">
+    <div class="header-truck">
+      <svg viewBox="0 0 48 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- Cargo box -->
+        <rect x="1" y="6" width="28" height="20" rx="2" fill="rgba(255,255,255,.15)" stroke="#fff" stroke-width="1.8"/>
+        <!-- Cab -->
+        <path d="M29 14 L29 26 L46 26 L46 18 L40 10 L29 10 Z" fill="rgba(255,255,255,.15)" stroke="#fff" stroke-width="1.8" stroke-linejoin="round"/>
+        <!-- Cab window -->
+        <path d="M31 13 L31 18 L42 18 L39 12 L31 12 Z" fill="rgba(255,255,255,.3)"/>
+        <!-- Front bumper -->
+        <rect x="43" y="22" width="3" height="4" rx="1" fill="#fff" opacity=".6"/>
+        <!-- Axle line -->
+        <line x1="1" y1="26" x2="46" y2="26" stroke="#fff" stroke-width="1.8" opacity=".5"/>
+        <!-- Rear wheel -->
+        <circle cx="10" cy="29" r="4" fill="rgba(255,255,255,.15)" stroke="#fff" stroke-width="1.8"/>
+        <circle cx="10" cy="29" r="1.5" fill="#fff" opacity=".7"/>
+        <!-- Front wheel -->
+        <circle cx="37" cy="29" r="4" fill="rgba(255,255,255,.15)" stroke="#fff" stroke-width="1.8"/>
+        <circle cx="37" cy="29" r="1.5" fill="#fff" opacity=".7"/>
+        <!-- Headlight -->
+        <rect x="44" y="17" width="3" height="2.5" rx=".8" fill="#ffd32a" opacity=".9"/>
+        <!-- Door line on cargo -->
+        <line x1="16" y1="6" x2="16" y2="26" stroke="#fff" stroke-width="1" opacity=".35"/>
+      </svg>
+    </div>
+    <div class="header-divider"></div>
+    <div>
+      <div class="header-title">VSL Logistics Dashboard</div>
+      <div class="header-sub">CEO Intelligence Platform</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="owner-tag">
+      <span class="ot-label">Owner</span>
+      <span class="ot-name">Manoj Sampath</span>
+    </div>
+    <div class="status-badge" id="file-badge">⬆ Upload Excel</div>
+    <button class="hdr-btn" onclick="triggerReupload()" title="Upload new file">↑ Re-upload</button>
+    <button class="hdr-btn danger" onclick="clearDashboard()" title="Clear data">✕ Clear</button>
+    <div class="status-badge active"><span class="status-dot pulse"></span>Live</div>
+    <div id="clock">--:--:--</div>
+    <input type="file" id="file-input" accept=".xlsx,.xls" style="display:none">
+  </div>
+</header>
+
+<!-- UPLOAD SCREEN -->
+<div id="upload-screen">
+  <div class="upload-card" id="drop-zone">
+    <div class="upload-icon">📦</div>
+    <div class="upload-title">Upload MIS Report</div>
+    <div class="upload-sub">Drop your Excel file or click to browse.<br>Sheet: <strong style="color:var(--lime)">YTD SL Road MIS</strong> will be loaded automatically.</div>
+    <button class="upload-btn" onclick="document.getElementById('file-input').click()">🗂 Choose File</button>
+    <div class="upload-hint">Processed entirely in your browser · No data leaves your machine</div>
+    <div class="upload-reqs">
+      <span class="req-chip">📊 Multi-Select Filters</span>
+      <span class="req-chip">📈 Weekly/Monthly Trends</span>
+      <span class="req-chip">🔍 Cross-Filter Charts</span>
+      <span class="req-chip">🧠 Auto Insights</span>
+      <span class="req-chip">⚠ Exception Alerts</span>
+    </div>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard">
+
+  <!-- FILTER PANEL -->
+  <div class="filter-panel">
+    <div class="filter-row">
+      <div class="filter-group narrow">
+        <div class="filter-label">Date From</div>
+        <input type="date" id="f-date-from" class="filter-control">
+      </div>
+      <div class="filter-group narrow">
+        <div class="filter-label">Date To</div>
+        <input type="date" id="f-date-to" class="filter-control">
+      </div>
+      <div class="filter-group narrow">
+        <div class="filter-label">Date Type</div>
+        <div class="dt-btns">
+          <button class="dt-btn active" data-type="indent">Indent</button>
+          <button class="dt-btn" data-type="placement">Placement</button>
+          <button class="dt-btn" data-type="dispatch">Dispatch</button>
+        </div>
+      </div>
+      <div class="filter-group narrow">
+        <div class="filter-label">Granularity</div>
+        <div class="gran-btns">
+          <button class="gran-btn" data-gran="daily">Daily</button>
+          <button class="gran-btn" data-gran="weekly">Weekly</button>
+          <button class="gran-btn active" data-gran="monthly">Monthly</button>
+        </div>
+      </div>
+      <div class="filter-group">
+        <div class="filter-label">Customer</div>
+        <div class="ms-wrap" id="ms-customer"></div>
+      </div>
+      <div class="filter-group">
+        <div class="filter-label">From</div>
+        <div class="ms-wrap" id="ms-from"></div>
+      </div>
+      <div class="filter-group">
+        <div class="filter-label">To</div>
+        <div class="ms-wrap" id="ms-to"></div>
+      </div>
+      <div class="filter-group">
+        <div class="filter-label">Transporter</div>
+        <div class="ms-wrap" id="ms-transporter"></div>
+      </div>
+      <div class="filter-group">
+        <div class="filter-label">Veh. Type</div>
+        <div class="ms-wrap" id="ms-veh-type"></div>
+      </div>
+      <div class="filter-group">
+        <div class="filter-label">Status</div>
+        <div class="ms-wrap" id="ms-status"></div>
+      </div>
+      <div class="filter-group">
+        <div class="filter-label">Trip Type</div>
+        <div class="ms-wrap" id="ms-trip-type"></div>
+      </div>
+      <div class="filter-actions">
+        <button class="btn-reset" onclick="resetFilters()">↺ Reset</button>
+        <button class="btn-apply" onclick="applyFilters()">▶ Apply</button>
+      </div>
+    </div>
+    <div class="filter-info" id="filter-tags"></div>
+  </div>
+
+  <!-- INSIGHTS -->
+  <div class="section-header">
+    <div class="section-title">🧠 Key Insights</div>
+    <div class="section-line"></div>
+    <div class="section-meta" id="insight-meta"></div>
+  </div>
+  <div class="insights-grid" id="insights-grid"></div>
+
+  <!-- KPIs -->
+  <div class="section-header">
+    <div class="section-title">📊 Key Metrics</div>
+    <div class="section-line"></div>
+  </div>
+  <div class="kpi-row"><div class="kpi-section-title">CORE</div><div class="kpi-grid" id="kpi-core"></div></div>
+  <div class="kpi-row"><div class="kpi-section-title">BACKLOG & STATUS</div><div class="kpi-grid" id="kpi-backlog"></div></div>
+  <div class="kpi-row"><div class="kpi-section-title">TURNAROUND TIME</div><div class="kpi-grid" id="kpi-tat"></div></div>
+  <div class="kpi-row"><div class="kpi-section-title">DETENTION</div><div class="kpi-grid" id="kpi-detention"></div></div>
+  <div class="kpi-row"><div class="kpi-section-title">COST</div><div class="kpi-grid" id="kpi-cost"></div></div>
+
+  <!-- FUNNEL -->
+  <div class="section-header">
+    <div class="section-title">🚛 Shipment Journey Funnel</div>
+    <div class="section-line"></div>
+  </div>
+  <div class="funnel-wrapper">
+    <div class="journey-scroll">
+      <div class="journey-track" id="funnel-steps">
+        <div class="journey-road"><div class="journey-progress" id="journey-progress"></div></div>
+      </div>
+    </div>
+    <div id="jnode-tooltip" class="jnode-tooltip"></div>
+    <div class="efficiency-strip" id="efficiency-strip"></div>
+  </div>
+
+  <!-- BOTTLENECKS -->
+  <div class="section-header">
+    <div class="section-title">🔴 Top Bottlenecks</div>
+    <div class="section-line"></div>
+  </div>
+  <div class="bottleneck-grid" id="bottleneck-grid"></div>
+
+  <!-- TRENDS -->
+  <div class="section-header">
+    <div class="section-title">📈 Demand & Execution Trends</div>
+    <div class="section-line"></div>
+    <div class="section-meta" id="chart-title-meta"></div>
+  </div>
+  <div class="charts-grid">
+    <div class="chart-card wide">
+      <div class="chart-header"><div class="chart-title">Indent · Placement · Dispatch · Reached · Delivered</div></div>
+      <div class="chart-canvas-wrap"><canvas id="chart-demand"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header"><div class="chart-title">Backlog Trend (Open Shipments)</div></div>
+      <div class="chart-canvas-wrap"><canvas id="chart-backlog"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header"><div class="chart-title">TAT Trends (Days)</div></div>
+      <div class="chart-canvas-wrap"><canvas id="chart-tat"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header"><div class="chart-title">Detention by Period (Days)</div></div>
+      <div class="chart-canvas-wrap"><canvas id="chart-detention"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header"><div class="chart-title">Freight Cost Trend (₹)</div></div>
+      <div class="chart-canvas-wrap"><canvas id="chart-cost"></canvas></div>
+    </div>
+  </div>
+
+  <!-- DEEP DIVE -->
+  <div class="section-header">
+    <div class="section-title">🔍 Deep Dive Analytics</div>
+    <div class="section-line"></div>
+    <span style="font-size:9.5px;color:var(--text4);margin-left:8px;">Click bars / slices to cross-filter entire dashboard</span>
+  </div>
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-header"><div class="chart-title">Top Transporters — Volume</div></div>
+      <div class="chart-canvas-wrap"><canvas id="chart-transporter"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header"><div class="chart-title">Top Routes (From → To)</div></div>
+      <div class="chart-canvas-wrap"><canvas id="chart-routes"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header"><div class="chart-title">Vehicle Type Distribution</div></div>
+      <div class="chart-canvas-wrap"><canvas id="chart-vehicle"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header"><div class="chart-title">Customer Split</div></div>
+      <div class="chart-canvas-wrap"><canvas id="chart-customer"></canvas></div>
+    </div>
+  </div>
+
+  <!-- EXCEPTION TABLE -->
+  <div class="section-header">
+    <div class="section-title">⚠ Exception Report</div>
+    <div class="section-line"></div>
+  </div>
+  <div class="table-card">
+    <div class="table-scroll">
+      <table><thead><tr>
+        <th>LR No.</th><th>Route</th><th>Transporter</th><th>Customer</th>
+        <th onclick="sortExc('_placementDelay')">Plcmt Delay ↕</th>
+        <th onclick="sortExc('_transitTime')">Transit Time ↕</th>
+        <th onclick="sortExc('_totalDetention')">Detention ↕</th>
+        <th>Trip Type</th><th>Status</th>
+      </tr></thead>
+      <tbody id="exception-tbody"></tbody></table>
+    </div>
+  </div>
+
+  <!-- SHIPMENT REGISTER -->
+  <div class="section-header">
+    <div class="section-title">🚛 Shipment Register</div>
+    <div class="section-line"></div>
+    <span id="table-count" style="font-size:10px;color:var(--text4);margin-left:8px;"></span>
+  </div>
+  <div class="table-card">
+    <div class="table-scroll">
+      <table><thead><tr>
+        <th>LR No.</th><th>Indent Date</th><th>Customer</th><th>Consignee</th>
+        <th>From</th><th>To</th><th>Veh. Type</th><th>Transporter</th>
+        <th>Freight (₹)</th><th>Plcmt Delay</th><th>Disp Delay</th><th>Transit</th>
+        <th>Trip Type</th><th>Location/Status</th><th>Status</th>
+      </tr></thead>
+      <tbody id="data-tbody"></tbody></table>
+    </div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════
+// CHART.JS DEFAULTS
+// ════════════════════════════════════════════════════════════
+Chart.defaults.color = '#6b9e94';
+Chart.defaults.borderColor = '#1e3530';
+Chart.defaults.font.family = "'Inter',sans-serif";
+Chart.defaults.font.size = 11;
+
+const PAL = ['#26a69a','#9bc53d','#54a0ff','#ff9f43','#ff6b6b','#a29bfe','#ffd32a','#fd79a8','#55efc4','#e17055'];
+
+// ════════════════════════════════════════════════════════════
+// KPI TOOLTIP DEFINITIONS
+// ════════════════════════════════════════════════════════════
+const KPI_TIPS = {
+  'Total Indents':       'COUNT of all rows in the filtered dataset where an Indent Date exists (based on selected date type and filters).',
+  'Completed':           'Rows where Actual Reporting At Destination AND Unloading/Release at Destination both exist.',
+  'In Transit':          'Rows where Dispatch Date exists BUT Actual Reporting At Destination does NOT exist.',
+  'At Destination':      'Rows where Actual Reporting At Destination exists but Unloading/Release does NOT exist (Reached but not unloaded).',
+  'Total Open':          'Not Placed + Placed Not Dispatched. Does NOT include In Transit.',
+  'Not Placed':          'COUNT where Indent Date exists but Act. Placement Date is MISSING.',
+  'Placed · Awaiting Dispatch': 'COUNT where Indent Date + Act. Placement Date exist but Dispatch Date is MISSING.',
+  'Total Backlog':       'Sum of "Not Placed" + "Placed Awaiting Dispatch". Requires immediate action.',
+  'Open Rate':           'Total Open / Total Indents × 100. Higher % indicates pipeline bottleneck.',
+  'Reached Not Unloaded':'Vehicles at destination but unloading has not been completed yet.',
+  'Avg Placement Delay': 'Average of (Act. Placement Date − Indent Date) in days, across all filtered shipments with both dates. Max(result,0).',
+  'Avg Dispatch Delay':  'Average of (Dispatch Date − Act. Placement Date) in days. Max(result,0).',
+  'Avg Transit Time':    'Average of (Unloading/Delivery Date − Dispatch Date) in days. Max(result,0).',
+  'Total Cycle Time':    'Average of (Unloading Date − Indent Date) for completed shipments — full end-to-end time.',
+  'Origin Detention':    'Sum of max(Dispatch−Placement−FreeDays, 0) days. Free days: 1 for Falta, 2 for all others. Local vehicles excluded.',
+  'Dest. Detention':     'Sum of max(Unloading−Reporting−2, 0) days for all shipments where both dates exist.',
+  'Avg Detention/Ship.': 'Total Detention (Origin + Dest.) ÷ Total Shipments in filtered view.',
+  '% With Detention':    'Count of shipments where total detention > 0 days ÷ Total shipments × 100.',
+  'Total Freight':       'SUM of "Total Freight (Rs.)" column across all filtered rows. Nulls treated as 0.',
+  'Avg Freight/Shipment':'Total Freight ÷ Total Shipments in the filtered dataset.',
+  'Total THC':           'SUM of "THC (Rs.)" column across all filtered rows.',
+};
+
+function showKPITip(e, title) {
+  const tip = document.getElementById('kpi-tooltip');
+  const desc = KPI_TIPS[title] || 'Calculated from filtered dataset.';
+  tip.innerHTML = `<b>ℹ ${title}</b>${desc}`;
+  tip.style.display = 'block';
+  positionTip(e);
+}
+function hideKPITip() { document.getElementById('kpi-tooltip').style.display = 'none'; }
+function positionTip(e) {
+  const tip = document.getElementById('kpi-tooltip');
+  const x = Math.min(e.clientX + 14, window.innerWidth - 280);
+  const y = Math.min(e.clientY + 14, window.innerHeight - 140);
+  tip.style.left = x + 'px';
+  tip.style.top = y + 'px';
+}
+document.addEventListener('mousemove', e => {
+  if (document.getElementById('kpi-tooltip').style.display === 'block') positionTip(e);
+});
+
+// ════════════════════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════════════════════
+let rawData = [], filteredData = [], allCharts = {};
+let dateType = 'indent', granularity = 'monthly';
+let crossFilter = { transporter: null, route: null, vehicle: null, customer: null };
+let excSortKey = '_placementDelay', excSortDir = -1;
+const msState = {
+  customer: new Set(), from: new Set(), to: new Set(),
+  transporter: new Set(), vehType: new Set(), status: new Set(), tripType: new Set()
+};
+
+// ════════════════════════════════════════════════════════════
+// CLOCK
+// ════════════════════════════════════════════════════════════
+(function tick() { document.getElementById('clock').textContent = new Date().toLocaleTimeString('en-IN'); setTimeout(tick, 1000); })();
+
+// ════════════════════════════════════════════════════════════
+// UPLOAD
+// ════════════════════════════════════════════════════════════
+const dz = document.getElementById('drop-zone');
+dz && dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+dz && dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+dz && dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('drag-over'); if (e.dataTransfer.files[0]) processFile(e.dataTransfer.files[0]); });
+document.getElementById('file-input').addEventListener('change', e => { if (e.target.files[0]) processFile(e.target.files[0]); });
+
+function triggerReupload() { document.getElementById('file-input').click(); }
+
+function clearDashboard() {
+  if (!rawData.length) return;
+  if (!confirm('Clear all data and return to upload screen?')) return;
+  rawData = []; filteredData = [];
+  Object.keys(allCharts).forEach(k => { try { allCharts[k].destroy(); } catch(e){} });
+  allCharts = {};
+  document.getElementById('file-badge').innerHTML = '⬆ Upload Excel';
+  document.getElementById('file-badge').className = 'status-badge';
+  document.getElementById('upload-screen').style.display = 'flex';
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('file-input').value = '';
+}
+
+function showLoading(v) { document.getElementById('loading-overlay').style.display = v ? 'flex' : 'none'; }
+
+function processFile(file) {
+  showLoading(true);
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+      const sn = wb.SheetNames.find(s => s.toLowerCase().includes('ytd sl road')) || wb.SheetNames[0];
+      const json = XLSX.utils.sheet_to_json(wb.Sheets[sn], { defval: null, raw: false, dateNF: 'yyyy-mm-dd' });
+      rawData = json.filter(r => {
+        const hasData = Object.values(r).some(v => v !== null && v !== '' && v !== undefined);
+        const hasId = r['Indent Date'] || r['LR No./ Shipment No.'] || r['Sl No'];
+        return hasData && hasId;
+      }).map(r => parseRow(r));
+
+      const fb = document.getElementById('file-badge');
+      fb.innerHTML = `📁 ${file.name} · ${rawData.length} rows`;
+      fb.className = 'status-badge file-loaded';
+
+      buildMultiSelects();
+      filteredData = [...rawData];
+      renderAll();
+      document.getElementById('upload-screen').style.display = 'none';
+      document.getElementById('dashboard').style.display = 'block';
+    } catch(err) { alert('Error: ' + err.message); console.error(err); }
+    showLoading(false);
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ════════════════════════════════════════════════════════════
+// DATE PARSING
+// ════════════════════════════════════════════════════════════
+function parseDate(val) {
+  if (!val) return null;
+  if (val instanceof Date) return isNaN(val.getTime()) ? null : val;
+  const s = String(val).trim();
+  if (!s || s === 'null') return null;
+  let d = new Date(s);
+  if (!isNaN(d.getTime())) return d;
+  const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+  if (m) {
+    d = new Date(`${m[3].length===2?'20'+m[3]:m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`);
+    if (!isNaN(d.getTime())) return d;
+  }
+  return null;
+}
+function daysDiff(d1, d2) {
+  if (!d1 || !d2) return null;
+  return Math.max(0, Math.round((d2.getTime() - d1.getTime()) / 86400000));
+}
+
+// ════════════════════════════════════════════════════════════
+// CURRENCY / NUMBER CLEANER — handles "₹ 8,000.00", "8,000", "Rs.500" etc.
+// ════════════════════════════════════════════════════════════
+function cleanNum(v) {
+  if (v === null || v === undefined || v === '') return 0;
+  if (typeof v === 'number') return isNaN(v) ? 0 : v;
+  // Convert to string and strip all non-numeric characters except dot and minus
+  const s = String(v)
+    .replace(/₹/g, '')
+    .replace(/Rs\.?/gi, '')
+    .replace(/INR/gi, '')
+    .replace(/,/g, '')
+    .replace(/\s/g, '')
+    .trim();
+  if (s === '' || s === '-') return 0;
+  const n = parseFloat(s);
+  return isNaN(n) ? 0 : n;
+}
+
+function parseRow(r) {
+  const indentDate   = parseDate(r['Indent Date']);
+  const actPlacement = parseDate(r['Act. Placement Date']);
+  const dispatch     = parseDate(r['Dispatch Date']);
+  const reporting    = parseDate(r['Actual Reporting At Destination']);
+  const unloading    = parseDate(r['Unloading/Release at Destination']);
+
+  // ── CORRECTED STATUS LOGIC ──────────────────────────────
+  // IN_TRANSIT    : Dispatch exists  AND  Reporting DOES NOT exist
+  // AT_DESTINATION: Reporting exists AND  Unloading DOES NOT exist
+  // COMPLETED     : Reporting exists AND  Unloading exists
+  let status;
+  if (!actPlacement)           status = 'NOT_PLACED';
+  else if (!dispatch)          status = 'PLACED_NOT_DISPATCHED';
+  else if (!reporting)         status = 'IN_TRANSIT';
+  else if (!unloading)         status = 'AT_DESTINATION';
+  else                         status = 'COMPLETED';
+
+  // TAT
+  const placementDelay = daysDiff(indentDate, actPlacement);
+  const dispatchDelay  = daysDiff(actPlacement, dispatch);
+  const transitTime    = daysDiff(dispatch, unloading);
+
+  // DETENTION
+  const fromLoc = String(r['From'] || '').toLowerCase().trim();
+  const isLocal = String(r['Veh. Type'] || '').toLowerCase().includes('local');
+  let originDetention = 0, destDetention = 0;
+  if (!isLocal && actPlacement && dispatch) {
+    const fd = fromLoc.includes('falta') ? 1 : 2;
+    originDetention = Math.max(0, (daysDiff(actPlacement, dispatch) || 0) - fd);
+  }
+  if (reporting && unloading) {
+    destDetention = Math.max(0, (daysDiff(reporting, unloading) || 0) - 2);
+  }
+
+  // CUSTOMER
+  let customer = String(r['VSLL Billing Customer'] || '').toUpperCase().trim();
+  if (customer.includes('VSL') || customer.includes('VSLL')) customer = 'VSL';
+  else if (customer.includes('EK') || customer.includes('EKPL')) customer = 'EK';
+  else if (!customer) customer = 'Other';
+
+  // TRIP TYPE from Remarks — case-insensitive, inclusion logic
+  const remarksRaw = String(r['Remarks'] || '').trim();
+  const remarksUp  = remarksRaw.toUpperCase();
+  const lr = String(r['LR No./ Shipment No.'] || '').trim();
+  let tripType;
+  if (remarksUp.includes('STO'))                          tripType = 'STO';
+  else if (remarksUp.includes('ACTUAL TRIP'))             tripType = 'Actual Trip';
+  else if (remarksRaw === '' && lr !== '')                 tripType = 'Direct Trip';
+  else if (remarksRaw !== '')                              tripType = 'Others';
+  else                                                     tripType = 'Direct Trip';
+
+  // CURRENT LOCATION DISPLAY
+  let currentLocation;
+  if (status === 'COMPLETED') currentLocation = 'Delivered';
+  else if (status === 'AT_DESTINATION') currentLocation = 'At Destination';
+  else if (status === 'IN_TRANSIT') currentLocation = String(r['Current Location'] || 'In Transit').trim() || 'In Transit';
+  else currentLocation = '—';
+
+  return {
+    ...r,
+    _indentDate: indentDate, _actPlacement: actPlacement,
+    _dispatch: dispatch, _reporting: reporting, _unloading: unloading,
+    _status: status,
+    _placementDelay: placementDelay, _dispatchDelay: dispatchDelay, _transitTime: transitTime,
+    _originDetention: originDetention, _destDetention: destDetention,
+    _totalDetention: originDetention + destDetention,
+    _customer: customer,
+    _freight: cleanNum(r['Total Freight (Rs.)']),
+    _thc: cleanNum(r['THC (Rs.)']),
+    _from: String(r['From'] || '').trim(),
+    _to: String(r['To'] || '').trim(),
+    _transporter: String(r['Transporter Name'] || '').trim(),
+    _vehType: String(r['Veh. Type'] || '').trim(),
+    _lr: String(r['LR No./ Shipment No.'] || '').trim(),
+    _consignee: String(r['Consignee Name'] || '').trim(),
+    _tripType: tripType,
+    _currentLocation: currentLocation,
+  };
+}
+
+// ════════════════════════════════════════════════════════════
+// MULTI-SELECT
+// ════════════════════════════════════════════════════════════
+const _msOptions = {};
+
+function buildMultiSelect(containerId, stateKey, options, ph = 'All') {
+  const wrap = document.getElementById(containerId);
+  if (!wrap) return;
+  const id = 'ms-' + stateKey;
+  wrap.innerHTML = `
+    <div class="ms-trigger" id="${id}-trigger" onclick="toggleMS('${id}')">
+      <span class="ms-label" id="${id}-label">${ph}</span>
+      <span class="ms-arrow">▼</span>
+    </div>
+    <div class="ms-dropdown" id="${id}-dd">
+      <div class="ms-search"><input type="text" placeholder="Search…" oninput="filterMSOpts('${id}','${stateKey}',this.value)"></div>
+      <div class="ms-option" onclick="toggleMSAll('${id}','${stateKey}')">
+        <input type="checkbox" id="${id}-all" checked><span>Select All</span>
+      </div>
+      <div class="ms-divider"></div>
+      <div id="${id}-opts"></div>
+    </div>`;
+  renderMSOpts(id, stateKey, options, '');
+}
+
+function renderMSOpts(id, stateKey, options, search) {
+  const state = msState[stateKey];
+  const el = document.getElementById(id + '-opts');
+  if (!el) return;
+  const filt = options.filter(o => !search || String(o).toLowerCase().includes(search.toLowerCase()));
+  el.innerHTML = filt.map(o => {
+    const trimmed = String(o).trim();
+    const v = trimmed.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    // checked when: nothing selected (show all) OR this value is in the selected set
+    const chk = state.size === 0 || state.has(trimmed) ? 'checked' : '';
+    return `<div class="ms-option" onclick="toggleMSOpt('${id}','${stateKey}','${v}')">
+      <input type="checkbox" ${chk} onclick="event.stopPropagation();toggleMSOpt('${id}','${stateKey}','${v}')">
+      <span>${o}</span></div>`;
+  }).join('');
+  updateMSLabel(id, stateKey);
+}
+
+function phText(sk) {
+  return {customer:'All Customers',from:'All Origins',to:'All Destinations',transporter:'All Transporters',vehType:'All Types',status:'All Statuses',tripType:'All Trip Types'}[sk]||'All';
+}
+
+function updateMSLabel(id, stateKey) {
+  const st = msState[stateKey], el = document.getElementById(id + '-label');
+  if (!el) return;
+  el.textContent = st.size === 0 ? phText(stateKey) : st.size === 1 ? [...st][0] : `${st.size} selected`;
+  const a = document.getElementById(id + '-all');
+  if (a) a.checked = st.size === 0;
+}
+
+function toggleMSOpt(id, stateKey, val) {
+  const st = msState[stateKey];
+  const trimmedVal = String(val).trim();
+  if (st.has(trimmedVal)) {
+    st.delete(trimmedVal);
+  } else {
+    st.add(trimmedVal);
+  }
+  // Update checkbox states
+  const optsEl = document.getElementById(id + '-opts');
+  if (optsEl) {
+    optsEl.querySelectorAll('.ms-option').forEach(op => {
+      const span = op.querySelector('span');
+      const cb   = op.querySelector('input');
+      if (cb && span) cb.checked = st.size === 0 || st.has(String(span.textContent).trim());
+    });
+  }
+  updateMSLabel(id, stateKey);
+}
+function toggleMSAll(id, stateKey) {
+  msState[stateKey].clear();
+  const wrap = document.getElementById('ms-' + stateKey);
+  if (wrap) wrap.querySelectorAll('#' + id + '-opts input[type=checkbox]').forEach(c => c.checked = true);
+  updateMSLabel(id, stateKey);
+}
+function filterMSOpts(id, stateKey, s) {
+  renderMSOpts(id, stateKey, _msOptions[stateKey] || [], s);
+}
+function toggleMS(id) {
+  const dd = document.getElementById(id + '-dd');
+  if (!dd) return;
+  document.querySelectorAll('.ms-dropdown.open').forEach(el => { if (el !== dd) el.classList.remove('open'); });
+  dd.classList.toggle('open');
+  if (dd.classList.contains('open')) {
+    const t = document.getElementById(id + '-trigger');
+    const rc = t.getBoundingClientRect();
+    const ddW = Math.max(rc.width, 210);
+    const ddH = 280; // max-height
+    // Calculate left position, ensure it doesn't go off screen right
+    let left = rc.left;
+    if (left + ddW > window.innerWidth - 8) left = window.innerWidth - ddW - 8;
+    if (left < 4) left = 4;
+    // Calculate top, flip upward if not enough room below
+    let top = rc.bottom + 4;
+    if (top + ddH > window.innerHeight - 8) top = rc.top - ddH - 4;
+    if (top < 4) top = rc.bottom + 4; // fallback: below anyway
+    dd.style.left = left + 'px';
+    dd.style.top = top + 'px';
+    dd.style.width = ddW + 'px';
+    dd.style.maxHeight = Math.min(ddH, window.innerHeight - top - 8) + 'px';
+    // Ensure it's above everything
+    dd.style.zIndex = '2147483647';
+  }
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('.ms-wrap')) document.querySelectorAll('.ms-dropdown.open').forEach(el => el.classList.remove('open'));
+});
+
+function buildMultiSelects() {
+  _msOptions.customer  = [...new Set(rawData.map(r => r._customer).filter(Boolean))].sort();
+  _msOptions.from      = [...new Set(rawData.map(r => r._from).filter(Boolean))].sort();
+  _msOptions.to        = [...new Set(rawData.map(r => r._to).filter(Boolean))].sort();
+  _msOptions.transporter = [...new Set(rawData.map(r => r._transporter).filter(Boolean))].sort();
+  _msOptions.vehType   = [...new Set(rawData.map(r => r._vehType).filter(Boolean))].sort();
+  _msOptions.status    = ['NOT_PLACED','PLACED_NOT_DISPATCHED','IN_TRANSIT','AT_DESTINATION','COMPLETED'];
+  _msOptions.tripType  = ['STO','Actual Trip','Direct Trip','Others'];
+
+  buildMultiSelect('ms-customer',   'customer',   _msOptions.customer,   'All Customers');
+  buildMultiSelect('ms-from',       'from',        _msOptions.from,       'All Origins');
+  buildMultiSelect('ms-to',         'to',          _msOptions.to,         'All Destinations');
+  buildMultiSelect('ms-transporter','transporter', _msOptions.transporter,'All Transporters');
+  buildMultiSelect('ms-veh-type',   'vehType',     _msOptions.vehType,    'All Types');
+  buildMultiSelect('ms-status',     'status',      _msOptions.status,     'All Statuses');
+  buildMultiSelect('ms-trip-type',  'tripType',    _msOptions.tripType,   'All Trip Types');
+
+  document.querySelectorAll('.dt-btn').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('.dt-btn').forEach(x => x.classList.remove('active'));
+    b.classList.add('active'); dateType = b.dataset.type;
+  }));
+  document.querySelectorAll('.gran-btn').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('.gran-btn').forEach(x => x.classList.remove('active'));
+    b.classList.add('active'); granularity = b.dataset.gran;
+    renderTrends(); updateChartMeta();
+  }));
+
+  const dates = rawData.map(r => r._indentDate).filter(Boolean);
+  if (dates.length) {
+    document.getElementById('f-date-from').value = new Date(Math.min(...dates.map(d => d.getTime()))).toISOString().split('T')[0];
+    document.getElementById('f-date-to').value   = new Date(Math.max(...dates.map(d => d.getTime()))).toISOString().split('T')[0];
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// FILTER APPLICATION
+// ════════════════════════════════════════════════════════════
+function getDateField(r) {
+  if (dateType === 'placement') return r._actPlacement;
+  if (dateType === 'dispatch')  return r._dispatch;
+  return r._indentDate;
+}
+
+function applyFilters() {
+  const from  = document.getElementById('f-date-from').value ? new Date(document.getElementById('f-date-from').value) : null;
+  const toVal = document.getElementById('f-date-to').value   ? new Date(document.getElementById('f-date-to').value + 'T23:59:59') : null;
+
+  // Pre-normalize set values for vehType and tripType to avoid whitespace/case mismatch
+  const vehSet  = new Set([...msState.vehType].map(v  => String(v).trim()));
+  const tripSet = new Set([...msState.tripType].map(v => String(v).trim()));
+
+  filteredData = rawData.filter(r => {
+    const df = getDateField(r);
+    if (from  && (!df || df < from))  return false;
+    if (toVal && (!df || df > toVal)) return false;
+    // Customer — IN logic
+    if (msState.customer.size    > 0 && !msState.customer.has(r._customer))       return false;
+    // From — IN logic
+    if (msState.from.size        > 0 && !msState.from.has(r._from))               return false;
+    // To — IN logic
+    if (msState.to.size          > 0 && !msState.to.has(r._to))                   return false;
+    // Transporter — IN logic
+    if (msState.transporter.size > 0 && !msState.transporter.has(r._transporter)) return false;
+    // Vehicle Type — IN logic (normalised)
+    if (vehSet.size > 0 && !vehSet.has(String(r._vehType || '').trim()))          return false;
+    // Status — IN logic
+    if (msState.status.size      > 0 && !msState.status.has(r._status))           return false;
+    // Trip Type — IN logic (normalised)
+    if (tripSet.size > 0 && !tripSet.has(String(r._tripType || '').trim()))       return false;
+    // Cross-filters
+    if (crossFilter.transporter && r._transporter !== crossFilter.transporter) return false;
+    if (crossFilter.vehicle     && r._vehType     !== crossFilter.vehicle)     return false;
+    if (crossFilter.customer    && r._customer    !== crossFilter.customer)    return false;
+    if (crossFilter.route && `${r._from} → ${r._to}` !== crossFilter.route)   return false;
+    return true;
+  });
+
+  renderAll();
+  renderFilterTags();
+  updateChartMeta();
+}
+
+function resetFilters() {
+  Object.keys(msState).forEach(k => msState[k].clear());
+  Object.keys(crossFilter).forEach(k => crossFilter[k] = null);
+  document.querySelectorAll('.dt-btn').forEach(b => { b.classList.remove('active'); if (b.dataset.type === 'indent') b.classList.add('active'); });
+  dateType = 'indent';
+  buildMultiSelects();
+  filteredData = [...rawData];
+  renderAll();
+  document.getElementById('filter-tags').innerHTML = '';
+  updateChartMeta();
+}
+
+function renderFilterTags() {
+  const el = document.getElementById('filter-tags');
+  const parts = [];
+
+  // Helper: build one tag per selected value in a msState key
+  const addTags = (stateKey, labelPrefix) => {
+    msState[stateKey].forEach(val => {
+      parts.push({ label: `${labelPrefix}: ${val}`, stateKey, val });
+    });
+  };
+
+  addTags('customer',   'Customer');
+  addTags('from',       'From');
+  addTags('to',         'To');
+  addTags('transporter','Transporter');
+  addTags('vehType',    'VehType');
+  addTags('status',     'Status');
+  addTags('tripType',   'TripType');
+
+  // Cross-filters
+  Object.entries(crossFilter).forEach(([k,v]) => {
+    if (v) parts.push({ label: `CF-${k}: ${v.slice(0,20)}`, cfKey: k });
+  });
+
+  if (!parts.length) {
+    el.innerHTML = `<span style="color:var(--text4)">No active filters — showing all ${filteredData.length} records</span>`;
+    return;
+  }
+
+  el.innerHTML = 'Active: ' + parts.map((p, i) =>
+    `<span class="filter-tag" data-tag-idx="${i}" onclick="removeFilterTag(${i})" title="Click to remove">${p.label} ✕</span>`
+  ).join('');
+
+  // Store parts on the element for removal logic
+  el._tagParts = parts;
+}
+
+function removeFilterTag(idx) {
+  const el = document.getElementById('filter-tags');
+  const parts = el._tagParts;
+  if (!parts || !parts[idx]) return;
+  const p = parts[idx];
+
+  if (p.cfKey) {
+    crossFilter[p.cfKey] = null;
+  } else if (p.stateKey && p.val !== undefined) {
+    msState[p.stateKey].delete(p.val);
+    // Resolve the correct ms-id (same logic as buildMultiSelect: id = 'ms-' + stateKey)
+    const msId = 'ms-' + p.stateKey;
+    const optsEl = document.getElementById(msId + '-opts');
+    if (optsEl) {
+      optsEl.querySelectorAll('.ms-option').forEach(op => {
+        const span = op.querySelector('span');
+        const cb   = op.querySelector('input');
+        if (span && cb && span.textContent === p.val) cb.checked = false;
+      });
+    }
+    updateMSLabel(msId, p.stateKey);
+  }
+
+  applyFilters();
+}
+
+function updateChartMeta() {
+  const from = document.getElementById('f-date-from').value;
+  const to   = document.getElementById('f-date-to').value;
+  const cust = msState.customer.size ? [...msState.customer].join(', ') : 'All Customers';
+  const el   = document.getElementById('chart-title-meta');
+  if (el) el.textContent = `${from||'—'} → ${to||'—'} · ${cust} · ${granularity}`;
+}
+
+// ════════════════════════════════════════════════════════════
+// RENDER ALL
+// ════════════════════════════════════════════════════════════
+function renderAll() {
+  renderKPIs();
+  renderFunnel();
+  renderInsights();
+  renderBottlenecks();
+  renderTrends();
+  renderDeepDive();
+  renderExceptionTable();
+  renderDataTable();
+}
+
+// ════════════════════════════════════════════════════════════
+// HELPERS
+// ════════════════════════════════════════════════════════════
+const safeAvg = arr => { const v = arr.filter(x => x !== null && !isNaN(x)); return v.length ? v.reduce((a,b)=>a+b,0)/v.length : 0; };
+const safeSum = arr => arr.filter(x => x !== null && !isNaN(x)).reduce((a,b)=>a+b,0);
+const fmtN = (n,dec=0) => (n===null||isNaN(n)) ? '—' : n.toLocaleString('en-IN',{maximumFractionDigits:dec,minimumFractionDigits:dec});
+const fmtDate = d => d ? d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'2-digit'}) : '—';
+function fmtMoney(n) {
+  if (!n || isNaN(n)) return '₹0';
+  if (n >= 1e7) return '₹' + (n/1e7).toFixed(2) + ' Cr';
+  if (n >= 1e5) return '₹' + (n/1e5).toFixed(2) + ' L';
+  return '₹' + Math.round(n).toLocaleString('en-IN');
+}
+
+function kpiCard(icon, label, value, unit, sub, type='') {
+  return `<div class="kpi-card ${type}" onmouseenter="showKPITip(event,'${label}')" onmouseleave="hideKPITip()">
+    <div class="kpi-icon">${icon}</div>
+    <div class="kpi-label">${label} <span class="kpi-info-btn" title="Click for definition">ℹ</span></div>
+    <div class="kpi-value">${value}<span class="kpi-unit">${unit}</span></div>
+    ${sub?`<div class="kpi-sub">${sub}</div>`:''}
+  </div>`;
+}
+
+// Truck icon SVG inline (small, themed)
+const TRUCK_SVG = `<svg style="width:16px;height:12px;vertical-align:middle;opacity:.65;margin-right:3px;" viewBox="0 0 24 16" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="3" width="15" height="10" rx="1.5" fill="#26a69a"/><path d="M15 6h5l2 4v3h-7V6z" fill="#9bc53d"/><circle cx="4" cy="14" r="2" fill="#0d5c52"/><circle cx="18" cy="14" r="2" fill="#0d5c52"/><rect x="1" y="7" width="13" height="2" rx="1" fill="rgba(255,255,255,.15)"/></svg>`;
+
+// ════════════════════════════════════════════════════════════
+// KPIs
+// ════════════════════════════════════════════════════════════
+function renderKPIs() {
+  const d = filteredData, total = d.length;
+
+  // STRICT STATUS COUNTS
+  const notPlaced   = d.filter(r => r._indentDate && !r._actPlacement).length;
+  const placedNoDisp= d.filter(r => r._indentDate && r._actPlacement && !r._dispatch).length;
+  const inTransit   = d.filter(r => r._dispatch && !r._reporting).length;          // Dispatch exists, Reporting does NOT
+  const atDest      = d.filter(r => r._reporting && !r._unloading).length;          // Reporting exists, Unloading does NOT
+  const completed   = d.filter(r => r._reporting && r._unloading).length;           // Both exist
+  const totalOpen   = notPlaced + placedNoDisp;
+  const pctOpen     = total ? ((totalOpen/total)*100).toFixed(1) : 0;
+  const pctComp     = total ? ((completed/total)*100).toFixed(1) : 0;
+
+  document.getElementById('kpi-core').innerHTML =
+    kpiCard('📦','Total Indents',fmtN(total),'',`All filtered records`) +
+    kpiCard('✅','Completed',fmtN(completed),'',`${pctComp}% — Reporting + Unloading done`,'accent') +
+    kpiCard('🚛','In Transit',fmtN(inTransit),'',`Dispatched, not yet reached`,'info') +
+    kpiCard('📍','At Destination',fmtN(atDest),'',`Reached, awaiting unloading`,'warning') +
+    kpiCard('🔓','Total Open',fmtN(totalOpen),'',`${pctOpen}% — Not placed + Awaiting dispatch`,totalOpen>0?'warning':'');
+
+  document.getElementById('kpi-backlog').innerHTML =
+    kpiCard('🚫','Not Placed',fmtN(notPlaced),'',`Indent exists, no placement`,'danger') +
+    kpiCard('⏳','Placed · Awaiting Dispatch',fmtN(placedNoDisp),'',`Placed but not dispatched`,'warning') +
+    kpiCard('🔴','Total Backlog',fmtN(totalOpen),'',`Not Placed + Awaiting`,totalOpen>5?'danger':'warning') +
+    kpiCard('📊','Open Rate',fmtN(parseFloat(pctOpen),1),'%',`${totalOpen} of ${total}`,parseFloat(pctOpen)>20?'danger':'warning') +
+    kpiCard('🏁','Reached Not Unloaded',fmtN(atDest),'',`At destination, unloading pending`,atDest>0?'warning':'');
+
+  const avgPD = safeAvg(d.filter(r=>r._placementDelay!==null).map(r=>r._placementDelay));
+  const avgDD = safeAvg(d.filter(r=>r._dispatchDelay!==null).map(r=>r._dispatchDelay));
+  const avgTT = safeAvg(d.filter(r=>r._transitTime!==null).map(r=>r._transitTime));
+  const avgCycle = safeAvg(d.filter(r=>r._indentDate&&r._unloading).map(r=>daysDiff(r._indentDate,r._unloading)||0));
+
+  document.getElementById('kpi-tat').innerHTML =
+    kpiCard('📅','Avg Placement Delay',fmtN(avgPD,1),'d','Indent → Placement',avgPD>3?'danger':avgPD>1?'warning':'accent') +
+    kpiCard('🕐','Avg Dispatch Delay',fmtN(avgDD,1),'d','Placement → Dispatch',avgDD>1?'warning':'accent') +
+    kpiCard('🗺','Avg Transit Time',fmtN(avgTT,1),'d','Dispatch → Delivery','') +
+    kpiCard('⏱','Total Cycle Time',fmtN(avgCycle,1),'d','Indent → Delivery','');
+
+  const totOrig = safeSum(d.map(r=>r._originDetention));
+  const totDest = safeSum(d.map(r=>r._destDetention));
+  const totDet  = totOrig + totDest;
+  const withDet = d.filter(r=>r._totalDetention>0).length;
+  const pctDet  = total ? ((withDet/total)*100).toFixed(1) : 0;
+
+  document.getElementById('kpi-detention').innerHTML =
+    kpiCard('🏭','Origin Detention',fmtN(totOrig),'d','Total days (excl. free days)',totOrig>0?'danger':'') +
+    kpiCard('📍','Dest. Detention',fmtN(totDest),'d','Total days (excl. 2 free days)',totDest>0?'warning':'') +
+    kpiCard('📈','Avg Detention/Ship.',fmtN(total?totDet/total:0,1),'d','Total ÷ Shipments','') +
+    kpiCard('⚠','% With Detention',fmtN(parseFloat(pctDet),1),'%',`${withDet} shipments`,parseFloat(pctDet)>20?'danger':'warning');
+
+  // COST — direct sum from filtered dataset
+  const totalFreight = safeSum(d.map(r => r._freight));
+  const avgFreight   = total ? totalFreight / total : 0;
+  const totalTHC     = safeSum(d.map(r => r._thc));
+
+  document.getElementById('kpi-cost').innerHTML =
+    kpiCard('💰','Total Freight',fmtMoney(totalFreight),'','Sum of Total Freight (Rs.) — filtered','') +
+    kpiCard('📉','Avg Freight/Shipment',fmtMoney(avgFreight),'','Total Freight ÷ Shipments','') +
+    kpiCard('🧾','Total THC',fmtMoney(totalTHC),'','Sum of THC (Rs.) — filtered','');
+}
+
+// ════════════════════════════════════════════════════════════
+// JOURNEY TRACKER FUNNEL — 6 STAGES
+// ════════════════════════════════════════════════════════════
+
+// SVG icons for each stage
+const STAGE_ICONS = {
+  Indent: `<svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="6" y="4" width="20" height="24" rx="3" stroke="currentColor" stroke-width="2" fill="none"/>
+    <line x1="11" y1="11" x2="21" y2="11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    <line x1="11" y1="16" x2="21" y2="16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    <line x1="11" y1="21" x2="17" y2="21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    <circle cx="9" cy="11" r="1.2" fill="currentColor"/>
+    <circle cx="9" cy="16" r="1.2" fill="currentColor"/>
+    <circle cx="9" cy="21" r="1.2" fill="currentColor"/>
+  </svg>`,
+
+  Placed: `<svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="3" y="10" width="22" height="14" rx="2.5" stroke="currentColor" stroke-width="2"/>
+    <path d="M25 15 h4 l2 5 v4 h-6 V15z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" fill="none"/>
+    <circle cx="8" cy="27" r="3" stroke="currentColor" stroke-width="2"/>
+    <circle cx="22" cy="27" r="3" stroke="currentColor" stroke-width="2"/>
+    <line x1="3" y1="17" x2="25" y2="17" stroke="currentColor" stroke-width="1.2" opacity=".4"/>
+    <polyline points="27.5,12 29.5,16 27.5,16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none" opacity=".6"/>
+  </svg>`,
+
+  Dispatched: `<svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="2" y="10" width="20" height="13" rx="2.5" stroke="currentColor" stroke-width="2"/>
+    <path d="M22 14 h5 l3 5 v4 h-8 V14z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" fill="none"/>
+    <circle cx="7" cy="26" r="3" stroke="currentColor" stroke-width="2"/>
+    <circle cx="24" cy="26" r="3" stroke="currentColor" stroke-width="2"/>
+    <path d="M18 7 L24 7 M21 4 L24 7 L21 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`,
+
+  'In Transit': `<svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="2" y="11" width="20" height="12" rx="2.5" stroke="currentColor" stroke-width="2"/>
+    <path d="M22 15 h5 l3 4 v4 h-8 V15z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" fill="none"/>
+    <circle cx="7" cy="26" r="3" stroke="currentColor" stroke-width="2"/>
+    <circle cx="24" cy="26" r="3" stroke="currentColor" stroke-width="2"/>
+    <path d="M2 22 h28" stroke="currentColor" stroke-width="1" opacity=".25"/>
+    <!-- Motion lines -->
+    <line x1="1" y1="14" x2="5" y2="14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity=".5"/>
+    <line x1="1" y1="17" x2="4" y2="17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity=".35"/>
+    <line x1="1" y1="20" x2="5" y2="20" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" opacity=".2"/>
+  </svg>`,
+
+  Reached: `<svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M16 3 C10.5 3 6 7.5 6 13 C6 20 16 29 16 29 C16 29 26 20 26 13 C26 7.5 21.5 3 16 3Z" stroke="currentColor" stroke-width="2" fill="none"/>
+    <circle cx="16" cy="13" r="4" stroke="currentColor" stroke-width="2" fill="none"/>
+    <circle cx="16" cy="13" r="1.5" fill="currentColor"/>
+  </svg>`,
+
+  Completed: `<svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="16" cy="16" r="12" stroke="currentColor" stroke-width="2"/>
+    <polyline points="10,16 14,21 22,11" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>`,
+};
+
+function renderFunnel() {
+  const d = filteredData;
+  const total = d.length;
+  const steps = [
+    { label:'Indent',     count: total,                                              key:'Indent' },
+    { label:'Placed',     count: d.filter(r=>r._actPlacement).length,               key:'Placed' },
+    { label:'Dispatched', count: d.filter(r=>r._dispatch).length,                   key:'Dispatched' },
+    { label:'In Transit', count: d.filter(r=>r._dispatch && !r._reporting).length,  key:'In Transit' },
+    { label:'Reached',    count: d.filter(r=>r._reporting).length,                  key:'Reached' },
+    { label:'Completed',  count: d.filter(r=>r._unloading).length,                  key:'Completed' },
+  ];
+
+  // Progress bar width: based on how far along the journey is
+  const maxFilled = steps.findLastIndex(s => s.count > 0);
+  const progressPct = total > 0 ? ((maxFilled + 1) / steps.length) * 100 : 0;
+  const prog = document.getElementById('journey-progress');
+  if (prog) prog.style.width = progressPct + '%';
+
+  const tip = document.getElementById('jnode-tooltip');
+
+  const container = document.getElementById('funnel-steps');
+  // Clear all except road
+  const road = container.querySelector('.journey-road');
+  container.innerHTML = '';
+  if (road) container.appendChild(road);
+  if (prog) { road && road.appendChild(prog); }
+
+  steps.forEach((s, i) => {
+    const prev = i > 0 ? steps[i-1].count : null;
+    const pct = prev && prev > 0 ? ((s.count / prev) * 100).toFixed(0) : null;
+    const pctOfTotal = total > 0 ? ((s.count / total) * 100).toFixed(1) : 0;
+
+    // State class
+    const isActive = s.count > 0 && i < steps.length - 1;
+    const isDone = s.key === 'Completed' && s.count > 0;
+    const isInactive = s.count === 0;
+    const stateClass = isDone ? 'done' : isInactive ? 'inactive' : isActive ? 'active' : 'active';
+
+    const icon = STAGE_ICONS[s.key] || STAGE_ICONS['Indent'];
+
+    const node = document.createElement('div');
+    node.className = `journey-stage ${stateClass}`;
+    node.innerHTML = `
+      <div class="jnode">
+        <div class="jnode-ring"></div>
+        ${icon}
+      </div>
+      <div class="jcount">${s.count.toLocaleString('en-IN')}</div>
+      <div class="jcount-sub">${pct && i > 0 ? pct + '% conv.' : '&nbsp;'}</div>
+      <div class="jlabel">${s.label}</div>`;
+
+    // Hover tooltip
+    node.addEventListener('mouseenter', e => {
+      if (!tip) return;
+      tip.innerHTML = `<b>${s.label}</b>${s.count.toLocaleString('en-IN')} shipments<br>${pctOfTotal}% of total indents${pct && i > 0 ? '<br>'+pct+'% from prev. stage' : ''}`;
+      tip.style.display = 'block';
+      positionJTip(e, tip);
+    });
+    node.addEventListener('mousemove', e => positionJTip(e, tip));
+    node.addEventListener('mouseleave', () => { if (tip) tip.style.display = 'none'; });
+
+    container.appendChild(node);
+  });
+
+  // Efficiency ratios
+  const plc = steps[1].count, dis = steps[2].count, del = steps[5].count;
+  const pR = total ? ((plc/total)*100).toFixed(1) : 0;
+  const dR = plc   ? ((dis/plc)*100).toFixed(1)   : 0;
+  const cR = dis   ? ((del/dis)*100).toFixed(1)    : 0;
+  const onT = () => {
+    const wp = d.filter(r=>r._placementDelay!==null);
+    return wp.length ? ((wp.filter(r=>r._placementDelay<=1).length/wp.length)*100).toFixed(1) : 0;
+  };
+  const rc = v => parseFloat(v)>=80?'good':parseFloat(v)>=60?'mid':'bad';
+
+  document.getElementById('efficiency-strip').innerHTML =
+    `<div class="eff-item"><div class="eff-label">🚛 Placement Rate</div><div class="eff-value ${rc(pR)}">${pR}%</div></div>` +
+    `<div class="eff-item"><div class="eff-label">🚚 Dispatch Rate</div><div class="eff-value ${rc(dR)}">${dR}%</div></div>` +
+    `<div class="eff-item"><div class="eff-label">✅ Completion Rate</div><div class="eff-value ${rc(cR)}">${cR}%</div></div>` +
+    `<div class="eff-item"><div class="eff-label">⏱ On-Time Placement</div><div class="eff-value ${rc(onT())}">${onT()}%</div></div>`;
+}
+
+function positionJTip(e, tip) {
+  if (!tip) return;
+  let x = e.clientX + 14, y = e.clientY + 14;
+  if (x + 180 > window.innerWidth) x = e.clientX - 180;
+  if (y + 120 > window.innerHeight) y = e.clientY - 120;
+  tip.style.left = x + 'px';
+  tip.style.top = y + 'px';
+}
+
+// ════════════════════════════════════════════════════════════
+// INSIGHTS
+// ════════════════════════════════════════════════════════════
+function renderInsights() {
+  const d = filteredData, total = d.length;
+  if (!total) { document.getElementById('insights-grid').innerHTML = '<div class="no-data">Upload data to view insights.</div>'; return; }
+
+  const ins = [];
+  const notPlaced = d.filter(r=>r._indentDate&&!r._actPlacement).length;
+  const atDest    = d.filter(r=>r._reporting&&!r._unloading).length;
+  const avgPD = safeAvg(d.filter(r=>r._placementDelay!==null).map(r=>r._placementDelay));
+  const withDet   = d.filter(r=>r._totalDetention>0).length;
+  const pctDet    = total ? (withDet/total)*100 : 0;
+  const avgTT     = safeAvg(d.filter(r=>r._transitTime!==null).map(r=>r._transitTime));
+  const totalFreight = safeSum(d.map(r=>r._freight));
+
+  if (notPlaced > 0)
+    ins.push({t:'red',l:'🚨 Critical Backlog',m:`${notPlaced} indent${notPlaced>1?'s':''} (${((notPlaced/total)*100).toFixed(1)}%) have not been placed. Vehicles required immediately.`});
+  else
+    ins.push({t:'green',l:'✅ No Unplaced Indents',m:`All ${total} indents in the filtered view have vehicles placed. Good placement execution.`});
+
+  if (atDest > 0)
+    ins.push({t:'amber',l:'⏳ Unloading Pending at Destination',m:`${atDest} shipment${atDest>1?'s':''} have reached destination but unloading is not complete. Follow up with consignees.`});
+
+  if (avgPD > 2)
+    ins.push({t:'red',l:'⏰ High Placement Delay',m:`Avg placement delay is ${avgPD.toFixed(1)} days — above 2-day threshold. Review indent-to-vehicle assignment SOP.`});
+  else if (avgPD > 1)
+    ins.push({t:'amber',l:'⚠ Placement Delay',m:`Avg placement delay of ${avgPD.toFixed(1)} days is slightly above 1-day benchmark.`});
+  else
+    ins.push({t:'green',l:'✅ Placement On Track',m:`Avg placement delay of ${avgPD.toFixed(1)} days — within acceptable range.`});
+
+  // Top delay transporter
+  const tMap = {};
+  d.filter(r=>r._transporter&&r._placementDelay!==null).forEach(r=>{ if(!tMap[r._transporter]) tMap[r._transporter]=[]; tMap[r._transporter].push(r._placementDelay); });
+  const tRank = Object.entries(tMap).filter(([,v])=>v.length>=2).map(([k,v])=>[k,safeAvg(v),v.length]).sort((a,b)=>b[1]-a[1]);
+  if (tRank.length) {
+    const [tp,delay,cnt] = tRank[0];
+    ins.push({t:delay>3?'red':'amber',l:'🚛 Top Delay Transporter',m:`${tp.slice(0,40)} — avg placement delay ${delay.toFixed(1)}d across ${cnt} shipments.`});
+  }
+
+  // Top detention route
+  const rDet = {};
+  d.filter(r=>r._totalDetention>0).forEach(r=>{ const k=`${r._from} → ${r._to}`; rDet[k]=(rDet[k]||0)+r._totalDetention; });
+  const topDR = Object.entries(rDet).sort((a,b)=>b[1]-a[1])[0];
+  if (topDR) ins.push({t:'amber',l:'🗺 Highest Detention Route',m:`${topDR[0]} — total ${topDR[1]} detention days. Review loading/unloading processes.`});
+
+  if (pctDet > 20)
+    ins.push({t:'red',l:'📦 High Detention Rate',m:`${pctDet.toFixed(1)}% of shipments (${withDet}) carry detention charges. Negotiate improved free-day norms.`});
+  else if (pctDet > 0)
+    ins.push({t:'green',l:'📦 Detention Under Control',m:`Only ${pctDet.toFixed(1)}% of shipments have detention. Continue monitoring.`});
+
+  if (totalFreight > 0)
+    ins.push({t:'green',l:'💰 Freight Summary',m:`Total freight in filtered view: ${fmtMoney(totalFreight)} across ${total} shipments (avg ${fmtMoney(totalFreight/total)}/ship).`});
+
+  document.getElementById('insight-meta').textContent = `${total} shipments analyzed`;
+  document.getElementById('insights-grid').innerHTML = ins.slice(0,6).map(i =>
+    `<div class="insight-card ${i.t}"><div class="insight-dot ${i.t}"></div>
+     <div><div class="insight-label ${i.t}">${i.l}</div><div class="insight-text">${i.m}</div></div></div>`
+  ).join('');
+}
+
+// ════════════════════════════════════════════════════════════
+// BOTTLENECKS
+// ════════════════════════════════════════════════════════════
+function renderBottlenecks() {
+  const d = filteredData;
+  const ind=d.length, plc=d.filter(r=>r._actPlacement).length, dis=d.filter(r=>r._dispatch).length, del=d.filter(r=>r._unloading).length;
+  const drops=[
+    {l:'Indent → Placed',  drop:ind-plc, pct:ind?((ind-plc)/ind*100).toFixed(1):0},
+    {l:'Placed → Dispatched',drop:plc-dis,pct:plc?((plc-dis)/plc*100).toFixed(1):0},
+    {l:'Dispatched → Delivered',drop:dis-del,pct:dis?((dis-del)/dis*100).toFixed(1):0},
+  ].sort((a,b)=>b.drop-a.drop);
+
+  const rMap={};
+  d.filter(r=>r._from&&r._to&&r._placementDelay!==null).forEach(r=>{ const k=`${r._from}→${r._to}`; if(!rMap[k]) rMap[k]=[]; rMap[k].push(r._placementDelay); });
+  const routeTop = Object.entries(rMap).map(([k,v])=>[k,safeAvg(v),v.length]).sort((a,b)=>b[1]-a[1]).slice(0,5);
+
+  const tMap={};
+  d.filter(r=>r._transporter&&r._placementDelay!==null).forEach(r=>{ if(!tMap[r._transporter]) tMap[r._transporter]=[]; tMap[r._transporter].push(r._placementDelay); });
+  const tpTop = Object.entries(tMap).map(([k,v])=>[k,safeAvg(v),v.length]).sort((a,b)=>b[1]-a[1]).slice(0,5);
+
+  const vc = v => v>5?'bad':v>2?'mid':'ok';
+  const dc = v => parseFloat(v)>30?'bad':parseFloat(v)>15?'mid':'ok';
+
+  document.getElementById('bottleneck-grid').innerHTML =
+    `<div class="bottleneck-card"><div class="bn-title">🔽 Stage Drop-off</div>${drops.map(s=>`<div class="bn-row"><div class="bn-name">${s.l}</div><div class="bn-val ${dc(s.pct)}">${s.drop} (${s.pct}%)</div></div>`).join('')}</div>` +
+    `<div class="bottleneck-card"><div class="bn-title">🗺 Routes — Highest Placement Delay</div>${routeTop.length?routeTop.map(([r,a,c])=>`<div class="bn-row"><div class="bn-name" title="${r}">${r.length>28?r.slice(0,26)+'…':r}</div><div class="bn-val ${vc(a)}">${a.toFixed(1)}d <span style="font-size:9px;color:var(--text4)">(${c})</span></div></div>`).join(''):'<div class="no-data" style="padding:8px">No data</div>'}</div>` +
+    `<div class="bottleneck-card"><div class="bn-title">🚛 Transporters — Highest Avg Delay</div>${tpTop.length?tpTop.map(([t,a,c])=>`<div class="bn-row"><div class="bn-name" title="${t}">${t.length>22?t.slice(0,20)+'…':t}</div><div class="bn-val ${vc(a)}">${a.toFixed(1)}d <span style="font-size:9px;color:var(--text4)">(${c})</span></div></div>`).join(''):'<div class="no-data" style="padding:8px">No data</div>'}</div>`;
+}
+
+// ════════════════════════════════════════════════════════════
+// TIME GROUPING
+// ════════════════════════════════════════════════════════════
+function getGroupKey(r) {
+  const d = getDateField(r);
+  if (!d) return null;
+  if (granularity === 'daily')   return d.toISOString().split('T')[0];
+  if (granularity === 'weekly') {
+    const t = new Date(d.getTime());
+    const dow = (t.getDay()+6)%7;
+    t.setDate(t.getDate()-dow);
+    const wk = Math.ceil((t - new Date(t.getFullYear(),0,1))/604800000+1);
+    return `${t.getFullYear()}-W${String(wk).padStart(2,'0')}`;
+  }
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+
+function groupData(data) {
+  const g = {};
+  data.forEach(r => { const k = getGroupKey(r); if (!k) return; if (!g[k]) g[k]=[]; g[k].push(r); });
+  return Object.fromEntries(Object.entries(g).sort((a,b)=>a[0].localeCompare(b[0])));
+}
+
+function prettyKey(k) {
+  if (granularity==='daily') { const d=new Date(k); return d.toLocaleDateString('en-IN',{day:'2-digit',month:'short'}); }
+  if (granularity==='weekly') return k;
+  const [y,m]=k.split('-');
+  return new Date(y,m-1).toLocaleString('default',{month:'short',year:'2-digit'});
+}
+
+// ════════════════════════════════════════════════════════════
+// TRENDS — including Delivered + Reached
+// ════════════════════════════════════════════════════════════
+function renderTrends() {
+  const grps = groupData(filteredData);
+  const labels = Object.keys(grps).map(prettyKey);
+  const vals   = Object.values(grps);
+
+  makeLineChart('chart-demand', labels, [
+    { label:'Indents',    data: vals.map(g=>g.length) },
+    { label:'Placed',     data: vals.map(g=>g.filter(r=>r._actPlacement).length) },
+    { label:'Dispatched', data: vals.map(g=>g.filter(r=>r._dispatch).length) },
+    { label:'Reached',    data: vals.map(g=>g.filter(r=>r._reporting).length) },
+    { label:'Delivered',  data: vals.map(g=>g.filter(r=>r._unloading).length) },
+  ]);
+
+  makeLineChart('chart-backlog', labels, [
+    { label:'Open (Not Placed + Awaiting)', data: vals.map(g=>g.filter(r=>!r._dispatch).length) },
+  ]);
+
+  makeLineChart('chart-tat', labels, [
+    { label:'Placement Delay', data: vals.map(g=>+safeAvg(g.map(r=>r._placementDelay).filter(v=>v!==null)).toFixed(1)) },
+    { label:'Dispatch Delay',  data: vals.map(g=>+safeAvg(g.map(r=>r._dispatchDelay).filter(v=>v!==null)).toFixed(1)) },
+    { label:'Transit Time',    data: vals.map(g=>+safeAvg(g.map(r=>r._transitTime).filter(v=>v!==null)).toFixed(1)) },
+  ]);
+
+  makeBarChart('chart-detention', labels, [
+    { label:'Origin Detention', data: vals.map(g=>safeSum(g.map(r=>r._originDetention))) },
+    { label:'Dest. Detention',  data: vals.map(g=>safeSum(g.map(r=>r._destDetention))) },
+  ]);
+
+  makeLineChart('chart-cost', labels, [
+    { label:'Total Freight (₹)', data: vals.map(g=>safeSum(g.map(r=>r._freight))) },
+  ]);
+}
+
+// ════════════════════════════════════════════════════════════
+// DEEP DIVE
+// ════════════════════════════════════════════════════════════
+function renderDeepDive() {
+  const cnt = (arr, key) => { const m={}; arr.forEach(r=>{ if(r[key]) m[r[key]]=(m[r[key]]||0)+1; }); return Object.entries(m).sort((a,b)=>b[1]-a[1]); };
+
+  const tpS = cnt(filteredData,'_transporter').slice(0,10);
+  makeCFBarChart('chart-transporter', tpS.map(([k])=>k.length>22?k.slice(0,20)+'…':k), tpS.map(([k])=>k), [{label:'Shipments',data:tpS.map(([,v])=>v)}], 'transporter', true);
+
+  const rtCnt={};
+  filteredData.forEach(r=>{ if(r._from&&r._to){ const k=`${r._from} → ${r._to}`; rtCnt[k]=(rtCnt[k]||0)+1; } });
+  const rtS = Object.entries(rtCnt).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  makeCFBarChart('chart-routes', rtS.map(([k])=>k.length>28?k.slice(0,26)+'…':k), rtS.map(([k])=>k), [{label:'Shipments',data:rtS.map(([,v])=>v)}], 'route', true);
+
+  const vhS = cnt(filteredData,'_vehType');
+  makeCFPieChart('chart-vehicle', vhS.map(([k])=>k), vhS.map(([k])=>k), vhS.map(([,v])=>v), 'vehicle');
+
+  const csS = cnt(filteredData,'_customer');
+  makeCFPieChart('chart-customer', csS.map(([k])=>k), csS.map(([k])=>k), csS.map(([,v])=>v), 'customer');
+}
+
+// ════════════════════════════════════════════════════════════
+// CHART BUILDERS
+// ════════════════════════════════════════════════════════════
+function destroyChart(id) { if (allCharts[id]) { try { allCharts[id].destroy(); } catch(e){} delete allCharts[id]; } }
+
+function makeLineChart(id, labels, datasets) {
+  destroyChart(id);
+  const ctx = document.getElementById(id); if (!ctx) return;
+  allCharts[id] = new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets: datasets.map((ds,i) => ({
+      ...ds, borderColor:PAL[i], backgroundColor:PAL[i]+'20',
+      fill:false, tension:.4, pointRadius:3, pointHoverRadius:6, borderWidth:2,
+    })) },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{labels:{boxWidth:10,padding:14,font:{size:10}}},
+        tooltip:{callbacks:{afterLabel:ctx=>`  ${((ctx.parsed.y/(filteredData.length||1))*100).toFixed(1)}% of total`}} },
+      scales:{ x:{grid:{display:false},ticks:{maxRotation:45,font:{size:9}}}, y:{grid:{color:'#1a2e28'},beginAtZero:true} },
+      animation:{duration:600}
+    }
+  });
+}
+
+function makeBarChart(id, labels, datasets) {
+  destroyChart(id);
+  const ctx = document.getElementById(id); if (!ctx) return;
+  allCharts[id] = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets: datasets.map((ds,i) => ({
+      ...ds, backgroundColor:PAL[i]+'cc', borderColor:PAL[i], borderWidth:1, borderRadius:4,
+    })) },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{labels:{boxWidth:10,padding:14,font:{size:10}}} },
+      scales:{ x:{grid:{display:false},ticks:{maxRotation:45,font:{size:9}}}, y:{grid:{color:'#1a2e28'},beginAtZero:true} },
+      animation:{duration:600}
+    }
+  });
+}
+
+function makeCFBarChart(id, displayLbls, rawLbls, datasets, cfKey, horizontal=false) {
+  destroyChart(id);
+  const ctx = document.getElementById(id); if (!ctx) return;
+  allCharts[id] = new Chart(ctx, {
+    type:'bar',
+    data:{ labels:displayLbls, datasets:datasets.map((ds,i)=>({
+      ...ds, backgroundColor:PAL[i]+'bb', borderColor:PAL[i], borderWidth:1, borderRadius:4,
+    })) },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      indexAxis:horizontal?'y':'x',
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{
+          title: items => rawLbls[items[0].dataIndex],
+          afterLabel: ctx => `  ${((ctx.parsed[horizontal?'x':'y']/(filteredData.length||1))*100).toFixed(1)}% of total`
+        }}
+      },
+      scales:{
+        x:{grid:{color:'#1a2e28'},beginAtZero:true},
+        y:{grid:horizontal?{color:'#1a2e28'}:{display:false},ticks:{font:{size:10}}}
+      },
+      onClick:(e,els)=>{ crossFilter[cfKey]=els.length?rawLbls[els[0].index]:null; applyFilters(); },
+      animation:{duration:400}
+    }
+  });
+}
+
+function makeCFPieChart(id, displayLbls, rawLbls, data, cfKey) {
+  destroyChart(id);
+  const ctx = document.getElementById(id); if (!ctx) return;
+  allCharts[id] = new Chart(ctx, {
+    type:'doughnut',
+    data:{ labels:displayLbls, datasets:[{ data, backgroundColor:PAL.slice(0,data.length).map(c=>c+'cc'), borderColor:'#080f0d', borderWidth:2 }] },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{position:'right',labels:{boxWidth:10,padding:12,font:{size:10}}},
+        tooltip:{callbacks:{afterLabel:ctx=>`${((ctx.parsed/(filteredData.length||1))*100).toFixed(1)}% of total`}}
+      },
+      onClick:(e,els)=>{ crossFilter[cfKey]=els.length?rawLbls[els[0].index]:null; applyFilters(); },
+      animation:{duration:400}
+    }
+  });
+}
+
+// ════════════════════════════════════════════════════════════
+// TABLES
+// ════════════════════════════════════════════════════════════
+function statusBadge(s) {
+  const m = {
+    COMPLETED:           ['bg','✓ Done'],
+    IN_TRANSIT:          ['bb','→ In Transit'],
+    AT_DESTINATION:      ['bp','📍 At Dest.'],
+    PLACED_NOT_DISPATCHED:['bo','⏳ Awaiting'],
+    NOT_PLACED:          ['br','✗ Not Placed'],
+  };
+  const [cls,lbl] = m[s] || ['bgr',s];
+  return `<span class="badge ${cls}">${lbl}</span>`;
+}
+
+function tripBadge(t) {
+  const m = {STO:['bb','STO'],'Actual Trip':['bg','Actual'],'Direct Trip':['bgr','Direct'],Others:['bo','Others']};
+  const [cls,lbl] = m[t] || ['bgr',t];
+  return `<span class="badge ${cls}">${lbl}</span>`;
+}
+
+let excData = [];
+function sortExc(key) { excSortKey = key; excSortDir *= -1; renderExceptionTable(); }
+
+function renderExceptionTable() {
+  excData = filteredData.filter(r =>
+    (r._placementDelay!==null && r._placementDelay>2) ||
+    (r._transitTime!==null && r._transitTime>7) ||
+    r._totalDetention > 0
+  );
+  excData.sort((a,b) => excSortDir * ((b[excSortKey]||0) - (a[excSortKey]||0)));
+
+  document.getElementById('exception-tbody').innerHTML = excData.length
+    ? excData.slice(0,300).map(r => `<tr>
+        <td style="color:#26a69a;font-weight:600">${r._lr||'—'}</td>
+        <td>${r._from||'—'} → ${r._to||'—'}</td>
+        <td>${r._transporter.slice(0,24)||'—'}</td>
+        <td>${r._customer||'—'}</td>
+        <td style="color:${(r._placementDelay||0)>2?'var(--red)':'var(--text2)'}">${r._placementDelay!==null?r._placementDelay+'d':'—'}</td>
+        <td style="color:${(r._transitTime||0)>7?'var(--orange)':'var(--text2)'}">${r._transitTime!==null?r._transitTime+'d':'—'}</td>
+        <td style="color:${r._totalDetention>0?'var(--yellow)':'var(--text2)'}">${r._totalDetention}d</td>
+        <td>${tripBadge(r._tripType)}</td>
+        <td>${statusBadge(r._status)}</td>
+      </tr>`).join('')
+    : `<tr><td colspan="9" class="no-data">🎉 No exceptions with current filters</td></tr>`;
+}
+
+function renderDataTable() {
+  const d = filteredData.slice(0,500);
+  document.getElementById('table-count').textContent = `Showing ${d.length} of ${filteredData.length} records`;
+  document.getElementById('data-tbody').innerHTML = d.length
+    ? d.map(r => `<tr>
+        <td style="color:#26a69a;font-weight:600">${r._lr||'—'}</td>
+        <td>${fmtDate(r._indentDate)}</td>
+        <td>${r._customer||'—'}</td>
+        <td style="max-width:130px;overflow:hidden;text-overflow:ellipsis">${r._consignee.slice(0,22)||'—'}</td>
+        <td>${r._from||'—'}</td>
+        <td>${r._to||'—'}</td>
+        <td>${r._vehType.slice(0,16)||'—'}</td>
+        <td>${r._transporter.slice(0,20)||'—'}</td>
+        <td style="text-align:right">${r._freight?'₹'+Math.round(r._freight).toLocaleString('en-IN'):'—'}</td>
+        <td style="text-align:center;color:${(r._placementDelay||0)>2?'var(--red)':'var(--text2)'}">${r._placementDelay!==null?r._placementDelay+'d':'—'}</td>
+        <td style="text-align:center">${r._dispatchDelay!==null?r._dispatchDelay+'d':'—'}</td>
+        <td style="text-align:center">${r._transitTime!==null?r._transitTime+'d':'—'}</td>
+        <td>${tripBadge(r._tripType)}</td>
+        <td style="color:var(--text3);font-size:10px">${r._currentLocation}</td>
+        <td>${statusBadge(r._status)}</td>
+      </tr>`).join('')
+    : `<tr><td colspan="15" class="no-data">No records match current filters.</td></tr>`;
+}
+</script>
+</body>
+</html>
