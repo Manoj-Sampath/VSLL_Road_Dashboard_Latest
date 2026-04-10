@@ -1,37 +1,5 @@
 <!DOCTYPE html>
 <html lang="en">
-<style>
-#password-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: #111;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 9999;
-}
-
-.password-box {
-  background: #1f1f1f;
-  padding: 30px;
-  border-radius: 10px;
-  text-align: center;
-  color: white;
-}
-
-.password-box input {
-  padding: 10px;
-  margin-top: 10px;
-}
-
-.password-box button {
-  margin-top: 10px;
-  padding: 10px;
-}
-</style>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -468,6 +436,23 @@ tr:hover td{background:rgba(26,122,110,.06);color:#0d2420;}
 ::-webkit-scrollbar-thumb:hover{background:var(--teal);}
 
 .no-data{text-align:center;padding:40px;color:var(--text4);font-size:12px;font-style:italic;}
+/* ── DRILL-THROUGH MODAL ──────────────────────── */
+.drill-toolbar{padding:10px 16px;border-bottom:1px solid rgba(26,122,110,.12);display:flex;align-items:center;gap:10px;flex-shrink:0;background:#f8faf9;}
+.drill-search{flex:1;background:#fff;border:1px solid rgba(26,122,110,.2);border-radius:6px;padding:7px 12px;font-family:'Inter',sans-serif;font-size:12px;outline:none;color:#0d2420;transition:border-color .2s;}
+.drill-search:focus{border-color:var(--teal-l);}
+.drill-count{font-size:11px;color:var(--text3);white-space:nowrap;}
+.drill-export{background:linear-gradient(135deg,#1a7a6e,#0d5c52);color:#fff;border:none;padding:7px 14px;border-radius:6px;font-family:'Inter',sans-serif;font-size:11px;font-weight:600;cursor:pointer;transition:all .2s;white-space:nowrap;}
+.drill-export:hover{opacity:.88;transform:translateY(-1px);}
+.drill-body{overflow:auto;flex:1;}
+/* Drill table wrapper: fixed height, both scroll axes */
+.drill-table-wrap{max-height:420px;overflow-y:auto;overflow-x:auto;border-radius:0 0 var(--radius) var(--radius);}
+.drill-table{width:max-content;min-width:100%;border-collapse:collapse;font-size:11px;}
+.drill-table thead{position:sticky;top:0;z-index:2;}
+.drill-table th{background:rgba(26,122,110,.1);color:#1a7a6e;font-family:'Poppins',sans-serif;font-size:9.5px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:9px 12px;text-align:left;border-bottom:1px solid rgba(26,122,110,.15);white-space:nowrap;cursor:pointer;user-select:none;}
+.drill-table th:hover{background:rgba(26,122,110,.16);color:#0d5c52;}
+.drill-table td{padding:8px 12px;border-bottom:1px solid rgba(26,122,110,.07);color:#1e4a42;white-space:nowrap;}
+.drill-table tr:hover td{background:rgba(26,122,110,.05);color:#0d2420;}
+
 /* YTD KPI row */
 .ytd-row{background:rgba(26,122,110,.04);border:1px solid rgba(26,122,110,.12);border-radius:var(--radius);padding:12px 14px;margin-bottom:14px;}
 .ytd-label{border-left:3px solid var(--teal) !important;}
@@ -476,37 +461,7 @@ tr:hover td{background:rgba(26,122,110,.06);color:#0d2420;}
 @media(max-width:800px){.charts-grid,.bottleneck-grid{grid-template-columns:1fr;}.chart-card.wide{grid-column:auto;}.kpi-grid{grid-template-columns:repeat(2,1fr);}}
 </style>
 </head>
-<script>
-function checkPassword() {
-  var password = document.getElementById("password-input").value;
-
-  if (password === "malay123") {
-    document.getElementById("password-overlay").style.display = "none";
-  } else {
-    document.getElementById("error-msg").style.display = "block";
-  }
-}
-
-// THIS PART FIXES ENTER KEY
-window.onload = function() {
-  document.getElementById("password-input")
-    .addEventListener("keydown", function(event) {
-      if (event.key === "Enter") {
-        checkPassword();
-      }
-    });
-};
-</script>
-</script>
 <body>
-<div id="password-overlay">
-  <div class="password-box">
-    <h2>Enter Password</h2>
-    <input type="password" id="password-input" placeholder="Enter password" />
-    <button onclick="checkPassword()">Enter</button>
-    <p id="error-msg" style="color:red; display:none;">Wrong password</p>
-  </div>
-</div>
 
 <!-- KPI TOOLTIP -->
 <div class="kpi-tooltip" id="kpi-tooltip"></div>
@@ -718,6 +673,10 @@ window.onload = function() {
       <div class="chart-header"><div class="chart-title">Freight Cost Trend (₹)</div></div>
       <div class="chart-canvas-wrap"><canvas id="chart-cost"></canvas></div>
     </div>
+    <div class="chart-card">
+      <div class="chart-header"><div class="chart-title">Avg Cost per MW (₹/MW)</div></div>
+      <div class="chart-canvas-wrap"><canvas id="chart-costmw"></canvas></div>
+    </div>
   </div>
 
   <!-- DEEP DIVE -->
@@ -780,6 +739,43 @@ window.onload = function() {
       <tbody id="data-tbody"></tbody></table>
     </div>
   </div>
+
+  <!-- DETAILED DATA VIEW — INLINE SECTION -->
+  <div id="drill-section">
+    <div class="section-header" style="margin-top:22px;">
+      <div class="section-title">🔍 Detailed Data View</div>
+      <div class="section-line"></div>
+      <span style="font-size:10px;color:var(--text4);margin-left:8px;">Click any KPI card, funnel stage, chart, or insight to view contributing records</span>
+    </div>
+    <div id="drill-card" class="table-card" style="padding:0;overflow:hidden;">
+      <!-- Bar shows title + back button; hidden until first drill -->
+      <div class="drill-section-bar" id="drill-bar" style="display:none;">
+        <div>
+          <div class="drill-section-title" id="drill-title">—</div>
+          <div class="drill-section-meta" id="drill-subtitle"></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="drill-count" id="drill-count" style="color:rgba(255,255,255,.7);font-size:11px;"></span>
+          <button class="drill-export" onclick="exportDrillCSV()">⬇ Export CSV</button>
+          <button class="drill-back-btn" onclick="drillBack()" id="drill-back-btn">⬆ Back to Dashboard</button>
+        </div>
+      </div>
+      <div class="drill-toolbar" id="drill-toolbar" style="display:none;">
+        <input class="drill-search" id="drill-search" type="text" placeholder="🔍 Search across all columns…" oninput="drillSearch(this.value)">
+      </div>
+      <div class="drill-hint" id="drill-hint">
+        <div style="font-size:36px;margin-bottom:12px;opacity:.4;">🖱</div>
+        <div style="font-family:'Poppins',sans-serif;font-weight:600;font-size:14px;color:var(--teal);margin-bottom:6px;">Click any KPI card, funnel stage, chart element, or insight</div>
+        <div style="font-size:12px;color:var(--text4);">The contributing records will appear here with search, sort, and CSV export.</div>
+      </div>
+      <div class="drill-table-wrap" id="drill-table-wrap" style="display:none;">
+        <table class="drill-table">
+          <thead id="drill-thead"></thead>
+          <tbody id="drill-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -816,7 +812,8 @@ const KPI_TIPS = {
   'Avg Detention/Ship.': 'Total Detention (Origin + Dest.) ÷ Total Shipments in filtered view.',
   '% With Detention':    'Count of shipments where total detention > 0 days ÷ Total shipments × 100.',
   'Total Freight':       'SUM of "Total Freight (Rs.)" column across all filtered rows. Nulls treated as 0.',
-  'Avg Freight/Shipment':'Total Freight ÷ Total Shipments in the filtered dataset.',
+  'Avg THC / Shipment':'Average THC (Rs.) per shipment = Total THC ÷ Number of Shipments in filtered view.',
+  'Total THC':'Sum of all THC (Rs.) values in the filtered dataset.',
   'Total THC':           'SUM of "THC (Rs.)" column across all filtered rows.',
 };
 
@@ -852,20 +849,48 @@ const msState = {
 };
 
 // ════════════════════════════════════════════════════════════
-// CLOCK
+// CLOCK — starts immediately, updates every second
 // ════════════════════════════════════════════════════════════
-(function tick() { document.getElementById('clock').textContent = new Date().toLocaleTimeString('en-IN'); setTimeout(tick, 1000); })();
+function updateClock() {
+  const el = document.getElementById('clock');
+  if (el) el.textContent = new Date().toLocaleTimeString('en-IN');
+}
+updateClock();
+setInterval(updateClock, 1000);
 
 // ════════════════════════════════════════════════════════════
-// UPLOAD
+// UPLOAD — event listeners attached after DOM ready
 // ════════════════════════════════════════════════════════════
-const dz = document.getElementById('drop-zone');
-dz && dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
-dz && dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
-dz && dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('drag-over'); if (e.dataTransfer.files[0]) processFile(e.dataTransfer.files[0]); });
-document.getElementById('file-input').addEventListener('change', e => { if (e.target.files[0]) processFile(e.target.files[0]); });
+function attachUploadListeners() {
+  const dz = document.getElementById('drop-zone');
+  const fi = document.getElementById('file-input');
 
-function triggerReupload() { document.getElementById('file-input').click(); }
+  if (dz) {
+    dz.addEventListener('dragover',  e => { e.preventDefault(); dz.classList.add('drag-over'); });
+    dz.addEventListener('dragleave', ()  => dz.classList.remove('drag-over'));
+    dz.addEventListener('drop',      e  => {
+      e.preventDefault(); dz.classList.remove('drag-over');
+      if (e.dataTransfer && e.dataTransfer.files[0]) processFile(e.dataTransfer.files[0]);
+    });
+  }
+
+  if (fi) {
+    fi.addEventListener('change', e => {
+      if (e.target.files && e.target.files[0]) processFile(e.target.files[0]);
+    });
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', attachUploadListeners);
+} else {
+  attachUploadListeners();
+}
+
+function triggerReupload() {
+  const fi = document.getElementById('file-input');
+  if (fi) fi.click();
+}
 
 function clearDashboard() {
   if (!rawData.length) return;
@@ -873,41 +898,109 @@ function clearDashboard() {
   rawData = []; filteredData = [];
   Object.keys(allCharts).forEach(k => { try { allCharts[k].destroy(); } catch(e){} });
   allCharts = {};
-  document.getElementById('file-badge').innerHTML = '⬆ Upload Excel';
-  document.getElementById('file-badge').className = 'status-badge';
-  document.getElementById('upload-screen').style.display = 'flex';
-  document.getElementById('dashboard').style.display = 'none';
-  document.getElementById('file-input').value = '';
+  const fb = document.getElementById('file-badge');
+  if (fb) { fb.innerHTML = '⬆ Upload Excel'; fb.className = 'status-badge'; }
+  const us = document.getElementById('upload-screen');
+  const db = document.getElementById('dashboard');
+  if (us) us.style.display = 'flex';
+  if (db) db.style.display = 'none';
+  const fi = document.getElementById('file-input');
+  if (fi) fi.value = '';
 }
 
-function showLoading(v) { document.getElementById('loading-overlay').style.display = v ? 'flex' : 'none'; }
+function showLoading(v) {
+  const el = document.getElementById('loading-overlay');
+  if (el) el.style.display = v ? 'flex' : 'none';
+}
 
 function processFile(file) {
+  if (!file) return;
   showLoading(true);
+
   const reader = new FileReader();
-  reader.onload = e => {
+
+  reader.onerror = () => {
+    showLoading(false);
+    alert('❌ Failed to read file. Please try again.');
+  };
+
+  reader.onload = function(e) {
     try {
+      // Parse workbook
       const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
-      const sn = wb.SheetNames.find(s => s.toLowerCase().includes('ytd sl road')) || wb.SheetNames[0];
-      const json = XLSX.utils.sheet_to_json(wb.Sheets[sn], { defval: null, raw: false, dateNF: 'yyyy-mm-dd' });
+
+      if (!wb || !wb.SheetNames || wb.SheetNames.length === 0) {
+        showLoading(false);
+        alert('❌ Could not read workbook. Please ensure this is a valid .xlsx file.');
+        return;
+      }
+
+      // Find the target sheet
+      const targetName = wb.SheetNames.find(s =>
+        s.toLowerCase().replace(/\s+/g,'').includes('ytdslroad')
+      );
+      const sheetName = targetName || wb.SheetNames[0];
+
+      if (!targetName) {
+        console.warn('Sheet "YTD SL Road MIS" not found. Using first sheet:', sheetName);
+      }
+
+      const ws = wb.Sheets[sheetName];
+      if (!ws) {
+        showLoading(false);
+        alert('❌ Could not access worksheet. File may be corrupted.');
+        return;
+      }
+
+      // Parse to JSON
+      const json = XLSX.utils.sheet_to_json(ws, {
+        defval: null, raw: false, dateNF: 'yyyy-mm-dd'
+      });
+
+      if (!json || json.length === 0) {
+        showLoading(false);
+        alert('⚠️ No data found in the sheet. Please check the file.');
+        return;
+      }
+
+      // Filter and parse rows
       rawData = json.filter(r => {
         const hasData = Object.values(r).some(v => v !== null && v !== '' && v !== undefined);
-        const hasId = r['Indent Date'] || r['LR No./ Shipment No.'] || r['Sl No'];
+        const hasId   = r['Indent Date'] || r['LR No./ Shipment No.'] || r['Sl No'];
         return hasData && hasId;
       }).map(r => parseRow(r));
 
-      const fb = document.getElementById('file-badge');
-      fb.innerHTML = `📁 ${file.name} · ${rawData.length} rows`;
-      fb.className = 'status-badge file-loaded';
+      if (rawData.length === 0) {
+        showLoading(false);
+        alert('⚠️ Data was found but no valid rows could be parsed. Please check column headers.');
+        return;
+      }
 
+      // Update header badge
+      const fb = document.getElementById('file-badge');
+      if (fb) {
+        fb.innerHTML = `📁 ${file.name} · ${rawData.length} rows`;
+        fb.className = 'status-badge file-loaded';
+      }
+
+      // Build filters and render
       buildMultiSelects();
       filteredData = [...rawData];
       renderAll();
-      document.getElementById('upload-screen').style.display = 'none';
-      document.getElementById('dashboard').style.display = 'block';
-    } catch(err) { alert('Error: ' + err.message); console.error(err); }
+
+      // Show dashboard
+      const us = document.getElementById('upload-screen');
+      const db = document.getElementById('dashboard');
+      if (us) us.style.display = 'none';
+      if (db) db.style.display = 'block';
+
+    } catch(err) {
+      console.error('processFile error:', err);
+      alert('❌ Error processing file: ' + err.message + '\n\nPlease ensure this is a valid Excel (.xlsx) file.');
+    }
     showLoading(false);
   };
+
   reader.readAsArrayBuffer(file);
 }
 
@@ -1011,6 +1104,12 @@ function parseRow(r) {
   else if (status === 'IN_TRANSIT') currentLocation = String(r['Current Location'] || 'In Transit').trim() || 'In Transit';
   else currentLocation = '—';
 
+  // Cost/MW calculation — Step 1: MWp = Total Wp / 1,000,000; Step 2: Cost per MWp = THC / MWp
+  const thc    = cleanNum(r['THC (Rs.)']);
+  const totalWp = cleanNum(r['Total Wp']);
+  const mw      = totalWp > 0 ? totalWp / 1000000 : 0; // Convert Wp → MWp
+  const costPerMW = mw > 0 ? thc / mw : 0;             // ₹ per MWp
+
   return {
     ...r,
     _indentDate: indentDate, _actPlacement: actPlacement,
@@ -1021,7 +1120,10 @@ function parseRow(r) {
     _totalDetention: originDetention + destDetention,
     _customer: customer,
     _freight: cleanNum(r['Total Freight (Rs.)']),
-    _thc: cleanNum(r['THC (Rs.)']),
+    _thc: thc,
+    _totalWp: totalWp,
+    _mw: mw,
+    _costPerMW: costPerMW,
     _from: String(r['From'] || '').trim(),
     _to: String(r['To'] || '').trim(),
     _transporter: String(r['Transporter Name'] || '').trim(),
@@ -1356,13 +1458,22 @@ function renderYTDKPIs() {
   const totalOpen   = notPlaced + placedNoDisp;
   const pctOpen     = total ? ((totalOpen/total)*100).toFixed(1) : 0;
 
+  // Store YTD dataset for drill access
+  window._ytdData = d;
+
   el.innerHTML =
-    kpiCard('🚫','YTD Not Placed',fmtN(notPlaced),'',`${total} total YTD · date filter ignored`,'danger') +
-    kpiCard('⏳','YTD Awaiting Dispatch',fmtN(placedNoDisp),'',`Placed but not dispatched`,'warning') +
-    kpiCard('🔴','YTD Total Open',fmtN(totalOpen),'',`${pctOpen}% of YTD indents`,totalOpen>5?'danger':'warning') +
-    kpiCard('🚛','YTD In Transit',fmtN(inTransit),'',`Dispatched, not yet reached`,'info') +
-    kpiCard('📍','YTD At Destination',fmtN(atDest),'',`Reached, unloading pending`,atDest>0?'warning':'') +
-    kpiCard('✅','YTD Completed',fmtN(completed),'',`${total?((completed/total)*100).toFixed(1):0}% completion rate`,'accent');
+    kpiCard('🚫','YTD Not Placed',fmtN(notPlaced),'',`${total} total YTD · date filter ignored`,'danger',
+      `drillOpen('YTD Not Placed',window._ytdData.filter(r=>r._indentDate&&!r._actPlacement))`) +
+    kpiCard('⏳','YTD Awaiting Dispatch',fmtN(placedNoDisp),'',`Placed but not dispatched`,'warning',
+      `drillOpen('YTD Awaiting Dispatch',window._ytdData.filter(r=>r._indentDate&&r._actPlacement&&!r._dispatch))`) +
+    kpiCard('🔴','YTD Total Open',fmtN(totalOpen),'',`${pctOpen}% of YTD indents`,totalOpen>5?'danger':'warning',
+      `drillOpen('YTD Total Open',window._ytdData.filter(r=>!r._dispatch))`) +
+    kpiCard('🚛','YTD In Transit',fmtN(inTransit),'',`Dispatched, not yet reached`,'info',
+      `drillOpen('YTD In Transit',window._ytdData.filter(r=>r._dispatch&&!r._reporting))`) +
+    kpiCard('📍','YTD At Destination',fmtN(atDest),'',`Reached, unloading pending`,atDest>0?'warning':'',
+      `drillOpen('YTD At Destination',window._ytdData.filter(r=>r._reporting&&!r._unloading))`) +
+    kpiCard('✅','YTD Completed',fmtN(completed),'',`${total?((completed/total)*100).toFixed(1):0}% completion rate`,'accent',
+      `drillOpen('YTD Completed',window._ytdData.filter(r=>r._reporting&&r._unloading))`);
 }
 const safeAvg = arr => { const v = arr.filter(x => x !== null && !isNaN(x)); return v.length ? v.reduce((a,b)=>a+b,0)/v.length : 0; };
 const safeSum = arr => arr.filter(x => x !== null && !isNaN(x)).reduce((a,b)=>a+b,0);
@@ -1375,14 +1486,25 @@ function fmtMoney(n) {
   return '₹' + Math.round(n).toLocaleString('en-IN');
 }
 
-function kpiCard(icon, label, value, unit, sub, type='') {
-  return `<div class="kpi-card ${type}" onmouseenter="showKPITip(event,'${label}')" onmouseleave="hideKPITip()">
+function kpiCard(icon, label, value, unit, sub, type='', drillFn='') {
+  const drillAttr = drillFn ? ` data-drill="${drillFn.replace(/"/g,'&quot;')}" style="cursor:pointer;"` : '';
+  const drillHint = drillFn ? `<span style="font-size:8px;opacity:.55;margin-left:3px;">🔍</span>` : '';
+  return `<div class="kpi-card ${type}" onmouseenter="showKPITip(event,'${label.replace(/'/g,"\\'")}')" onmouseleave="hideKPITip()"${drillAttr}>
     <div class="kpi-icon">${icon}</div>
-    <div class="kpi-label">${label} <span class="kpi-info-btn" title="Click for definition">ℹ</span></div>
+    <div class="kpi-label">${label}${drillHint} <span class="kpi-info-btn" title="Click for definition">ℹ</span></div>
     <div class="kpi-value">${value}<span class="kpi-unit">${unit}</span></div>
     ${sub?`<div class="kpi-sub">${sub}</div>`:''}
   </div>`;
 }
+
+// Wire up KPI card clicks via event delegation (avoids inline onclick/broken HTML)
+document.addEventListener('click', e => {
+  const card = e.target.closest('.kpi-card[data-drill]');
+  if (card) {
+    const fn = card.getAttribute('data-drill');
+    if (fn) try { eval(fn); } catch(err) { console.error('drill error:', err); }
+  }
+});
 
 // Truck icon SVG inline (small, themed)
 const TRUCK_SVG = `<svg style="width:16px;height:12px;vertical-align:middle;opacity:.65;margin-right:3px;" viewBox="0 0 24 16" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="3" width="15" height="10" rx="1.5" fill="#26a69a"/><path d="M15 6h5l2 4v3h-7V6z" fill="#9bc53d"/><circle cx="4" cy="14" r="2" fill="#0d5c52"/><circle cx="18" cy="14" r="2" fill="#0d5c52"/><rect x="1" y="7" width="13" height="2" rx="1" fill="rgba(255,255,255,.15)"/></svg>`;
@@ -1404,18 +1526,28 @@ function renderKPIs() {
   const pctComp     = total ? ((completed/total)*100).toFixed(1) : 0;
 
   document.getElementById('kpi-core').innerHTML =
-    kpiCard('📦','Total Indents',fmtN(total),'',`All filtered records`) +
-    kpiCard('✅','Completed',fmtN(completed),'',`${pctComp}% — Reporting + Unloading done`,'accent') +
-    kpiCard('🚛','In Transit',fmtN(inTransit),'',`Dispatched, not yet reached`,'info') +
-    kpiCard('📍','At Destination',fmtN(atDest),'',`Reached, awaiting unloading`,'warning') +
-    kpiCard('🔓','Total Open',fmtN(totalOpen),'',`${pctOpen}% — Not placed + Awaiting dispatch`,totalOpen>0?'warning':'');
+    kpiCard('📦','Total Indents',fmtN(total),'',`All filtered records`,'',
+      'drillOpen("All Indents",filteredData)') +
+    kpiCard('✅','Completed',fmtN(completed),'',`${pctComp}% — Reporting + Unloading done`,'accent',
+      'drillOpen("Completed Shipments",filteredData.filter(r=>r._reporting&&r._unloading))') +
+    kpiCard('🚛','In Transit',fmtN(inTransit),'',`Dispatched, not yet reached`,'info',
+      'drillOpen("In Transit",filteredData.filter(r=>r._dispatch&&!r._reporting))') +
+    kpiCard('📍','At Destination',fmtN(atDest),'',`Reached, awaiting unloading`,'warning',
+      'drillOpen("At Destination",filteredData.filter(r=>r._reporting&&!r._unloading))') +
+    kpiCard('🔓','Total Open',fmtN(totalOpen),'',`${pctOpen}% — Not placed + Awaiting dispatch`,totalOpen>0?'warning':'',
+      'drillOpen("Total Open",filteredData.filter(r=>!r._dispatch))');
 
   document.getElementById('kpi-backlog').innerHTML =
-    kpiCard('🚫','Not Placed',fmtN(notPlaced),'',`Indent exists, no placement`,'danger') +
-    kpiCard('⏳','Placed · Awaiting Dispatch',fmtN(placedNoDisp),'',`Placed but not dispatched`,'warning') +
-    kpiCard('🔴','Total Backlog',fmtN(totalOpen),'',`Not Placed + Awaiting`,totalOpen>5?'danger':'warning') +
-    kpiCard('📊','Open Rate',fmtN(parseFloat(pctOpen),1),'%',`${totalOpen} of ${total}`,parseFloat(pctOpen)>20?'danger':'warning') +
-    kpiCard('🏁','Reached Not Unloaded',fmtN(atDest),'',`At destination, unloading pending`,atDest>0?'warning':'');
+    kpiCard('🚫','Not Placed',fmtN(notPlaced),'',`Indent exists, no placement`,'danger',
+      'drillOpen("Not Placed",filteredData.filter(r=>r._indentDate&&!r._actPlacement))') +
+    kpiCard('⏳','Placed · Awaiting Dispatch',fmtN(placedNoDisp),'',`Placed but not dispatched`,'warning',
+      'drillOpen("Awaiting Dispatch",filteredData.filter(r=>r._indentDate&&r._actPlacement&&!r._dispatch))') +
+    kpiCard('🔴','Total Backlog',fmtN(totalOpen),'',`Not Placed + Awaiting`,totalOpen>5?'danger':'warning',
+      'drillOpen("Total Backlog",filteredData.filter(r=>!r._dispatch))') +
+    kpiCard('📊','Open Rate',fmtN(parseFloat(pctOpen),1),'%',`${totalOpen} of ${total}`,parseFloat(pctOpen)>20?'danger':'warning',
+      'drillOpen("Open Shipments",filteredData.filter(r=>!r._unloading))') +
+    kpiCard('🏁','Reached Not Unloaded',fmtN(atDest),'',`At destination, unloading pending`,atDest>0?'warning':'',
+      'drillOpen("Reached Not Unloaded",filteredData.filter(r=>r._reporting&&!r._unloading))');
 
   const avgPD = safeAvg(d.filter(r=>r._placementDelay!==null).map(r=>r._placementDelay));
   const avgDD = safeAvg(d.filter(r=>r._dispatchDelay!==null).map(r=>r._dispatchDelay));
@@ -1423,10 +1555,14 @@ function renderKPIs() {
   const avgCycle = safeAvg(d.filter(r=>r._indentDate&&r._unloading).map(r=>daysDiff(r._indentDate,r._unloading)||0));
 
   document.getElementById('kpi-tat').innerHTML =
-    kpiCard('📅','Avg Placement Delay',fmtN(avgPD,1),'d','Indent → Placement',avgPD>3?'danger':avgPD>1?'warning':'accent') +
-    kpiCard('🕐','Avg Dispatch Delay',fmtN(avgDD,1),'d','Placement → Dispatch',avgDD>1?'warning':'accent') +
-    kpiCard('🗺','Avg Transit Time',fmtN(avgTT,1),'d','Dispatch → Delivery','') +
-    kpiCard('⏱','Total Cycle Time',fmtN(avgCycle,1),'d','Indent → Delivery','');
+    kpiCard('📅','Avg Placement Delay',fmtN(avgPD,1),'d','Indent → Placement',avgPD>3?'danger':avgPD>1?'warning':'accent',
+      `drillOpen('Placement Delay &gt;0',filteredData.filter(r=>r._placementDelay>0))`) +
+    kpiCard('🕐','Avg Dispatch Delay',fmtN(avgDD,1),'d','Placement → Dispatch',avgDD>1?'warning':'accent',
+      `drillOpen('Dispatch Delay &gt;0',filteredData.filter(r=>r._dispatchDelay>0))`) +
+    kpiCard('🗺','Avg Transit Time',fmtN(avgTT,1),'d','Dispatch → Delivery','',
+      `drillOpen('Transit Time Records',filteredData.filter(r=>r._transitTime!==null))`) +
+    kpiCard('⏱','Total Cycle Time',fmtN(avgCycle,1),'d','Indent → Delivery','',
+      `drillOpen('Completed Cycle',filteredData.filter(r=>r._indentDate&&r._unloading))`);
 
   const totOrig = safeSum(d.map(r=>r._originDetention));
   const totDest = safeSum(d.map(r=>r._destDetention));
@@ -1435,20 +1571,32 @@ function renderKPIs() {
   const pctDet  = total ? ((withDet/total)*100).toFixed(1) : 0;
 
   document.getElementById('kpi-detention').innerHTML =
-    kpiCard('🏭','Origin Detention',fmtN(totOrig),'d','Total days (excl. free days)',totOrig>0?'danger':'') +
-    kpiCard('📍','Dest. Detention',fmtN(totDest),'d','Total days (excl. 2 free days)',totDest>0?'warning':'') +
-    kpiCard('📈','Avg Detention/Ship.',fmtN(total?totDet/total:0,1),'d','Total ÷ Shipments','') +
-    kpiCard('⚠','% With Detention',fmtN(parseFloat(pctDet),1),'%',`${withDet} shipments`,parseFloat(pctDet)>20?'danger':'warning');
+    kpiCard('🏭','Origin Detention',fmtN(totOrig),'d','Total days (excl. free days)',totOrig>0?'danger':'',
+      `drillOpen('Origin Detention',filteredData.filter(r=>r._originDetention>0))`) +
+    kpiCard('📍','Dest. Detention',fmtN(totDest),'d','Total days (excl. 2 free days)',totDest>0?'warning':'',
+      `drillOpen('Dest. Detention',filteredData.filter(r=>r._destDetention>0))`) +
+    kpiCard('📈','Avg Detention/Ship.',fmtN(total?totDet/total:0,1),'d','Total ÷ Shipments','',
+      `drillOpen('All Detention',filteredData.filter(r=>r._totalDetention>0))`) +
+    kpiCard('⚠','% With Detention',fmtN(parseFloat(pctDet),1),'%',`${withDet} shipments`,parseFloat(pctDet)>20?'danger':'warning',
+      `drillOpen('Shipments With Detention',filteredData.filter(r=>r._totalDetention>0))`);
 
-  // COST — direct sum from filtered dataset
-  const totalFreight = safeSum(d.map(r => r._freight));
-  const avgFreight   = total ? totalFreight / total : 0;
-  const totalTHC     = safeSum(d.map(r => r._thc));
+  // COST — THC & Cost/MW only (Freight KPIs removed per requirements)
+  const totalTHC  = safeSum(d.map(r => r._thc));
+  const avgTHC    = total ? totalTHC / total : 0;
+  // Cost/MW
+  const mwRows = d.filter(r => r._mw > 0 && r._costPerMW > 0);
+  const avgCostMW = mwRows.length ? safeAvg(mwRows.map(r => r._costPerMW)) : 0;
 
   document.getElementById('kpi-cost').innerHTML =
-    kpiCard('💰','Total Freight',fmtMoney(totalFreight),'','Sum of Total Freight (Rs.) — filtered','') +
-    kpiCard('📉','Avg Freight/Shipment',fmtMoney(avgFreight),'','Total Freight ÷ Shipments','') +
-    kpiCard('🧾','Total THC',fmtMoney(totalTHC),'','Sum of THC (Rs.) — filtered','');
+    kpiCard('🧾','Total THC',fmtMoney(totalTHC),'','Sum of THC (Rs.) — filtered dataset','',
+      `drillOpen('Total THC',filteredData.filter(r=>r._thc>0))`) +
+    kpiCard('📉','Avg THC / Shipment',
+      avgTHC > 0 ? '₹' + avgTHC.toLocaleString('en-IN',{maximumFractionDigits:2,minimumFractionDigits:2}) : '₹0',
+      '','Total THC ÷ Number of Shipments','',
+      `drillOpen('Avg THC per Shipment',filteredData)`) +
+    kpiCard('⚡','Avg Cost/MW',avgCostMW>0?'₹'+Math.round(avgCostMW).toLocaleString('en-IN'):'—','',
+      `THC ÷ MWp · ${mwRows.length} rows with Wp data`,'info',
+      `drillOpen('Cost per MW',filteredData.filter(r=>r._mw>0))`);
 }
 
 // ════════════════════════════════════════════════════════════
@@ -1562,12 +1710,28 @@ function renderFunnel() {
     // Hover tooltip
     node.addEventListener('mouseenter', e => {
       if (!tip) return;
-      tip.innerHTML = `<b>${s.label}</b>${s.count.toLocaleString('en-IN')} shipments<br>${pctOfTotal}% of total indents${pct && i > 0 ? '<br>'+pct+'% from prev. stage' : ''}`;
+      tip.innerHTML = `<b>${s.label}</b>${s.count.toLocaleString('en-IN')} shipments<br>${pctOfTotal}% of total indents${pct && i > 0 ? '<br>'+pct+'% from prev. stage' : ''}<br><span style="color:rgba(255,255,255,.6);font-size:10px;">Click to drill through</span>`;
       tip.style.display = 'block';
       positionJTip(e, tip);
     });
     node.addEventListener('mousemove', e => positionJTip(e, tip));
     node.addEventListener('mouseleave', () => { if (tip) tip.style.display = 'none'; });
+
+    // Click → drill-through
+    node.style.cursor = 'pointer';
+    node.addEventListener('click', () => {
+      if (tip) tip.style.display = 'none';
+      // Determine rows for this funnel stage
+      const stageRows = {
+        'Indent':     filteredData,
+        'Placed':     filteredData.filter(r => r._actPlacement),
+        'Dispatched': filteredData.filter(r => r._dispatch),
+        'In Transit': filteredData.filter(r => r._dispatch && !r._reporting),
+        'Reached':    filteredData.filter(r => r._reporting),
+        'Completed':  filteredData.filter(r => r._unloading),
+      };
+      drillOpen(`Funnel: ${s.label}`, stageRows[s.key] || []);
+    });
 
     container.appendChild(node);
   });
@@ -1606,7 +1770,7 @@ function renderInsights() {
   const d = filteredData, total = d.length;
   if (!total) { document.getElementById('insights-grid').innerHTML = '<div class="no-data">Upload data to view insights.</div>'; return; }
 
-  const ins = [];
+  // insight objects built below
   const notPlaced = d.filter(r=>r._indentDate&&!r._actPlacement).length;
   const atDest    = d.filter(r=>r._reporting&&!r._unloading).length;
   const avgPD = safeAvg(d.filter(r=>r._placementDelay!==null).map(r=>r._placementDelay));
@@ -1615,48 +1779,83 @@ function renderInsights() {
   const avgTT     = safeAvg(d.filter(r=>r._transitTime!==null).map(r=>r._transitTime));
   const totalFreight = safeSum(d.map(r=>r._freight));
 
+  // Build insight objects with: label, message, filter logic description, and drill rows
+  const insObjs = [];
+
   if (notPlaced > 0)
-    ins.push({t:'red',l:'🚨 Critical Backlog',m:`${notPlaced} indent${notPlaced>1?'s':''} (${((notPlaced/total)*100).toFixed(1)}%) have not been placed. Vehicles required immediately.`});
+    insObjs.push({t:'red',l:'🚨 Critical Backlog',m:`${notPlaced} indent${notPlaced>1?'s':''} (${((notPlaced/total)*100).toFixed(1)}%) have not been placed. Vehicles required immediately.`,
+      logic:'Indent Date exists AND Act. Placement Date is MISSING.',
+      rows: d.filter(r=>r._indentDate&&!r._actPlacement)});
   else
-    ins.push({t:'green',l:'✅ No Unplaced Indents',m:`All ${total} indents in the filtered view have vehicles placed. Good placement execution.`});
+    insObjs.push({t:'green',l:'✅ No Unplaced Indents',m:`All ${total} indents in the filtered view have vehicles placed.`,
+      logic:'No rows found where Indent Date exists and Act. Placement Date is missing.',
+      rows: d.filter(r=>r._indentDate&&r._actPlacement)});
 
   if (atDest > 0)
-    ins.push({t:'amber',l:'⏳ Unloading Pending at Destination',m:`${atDest} shipment${atDest>1?'s':''} have reached destination but unloading is not complete. Follow up with consignees.`});
+    insObjs.push({t:'amber',l:'⏳ Unloading Pending at Destination',m:`${atDest} shipment${atDest>1?'s':''} have reached destination but unloading is not complete.`,
+      logic:'Actual Reporting At Destination exists AND Unloading/Release does NOT exist.',
+      rows: d.filter(r=>r._reporting&&!r._unloading)});
 
   if (avgPD > 2)
-    ins.push({t:'red',l:'⏰ High Placement Delay',m:`Avg placement delay is ${avgPD.toFixed(1)} days — above 2-day threshold. Review indent-to-vehicle assignment SOP.`});
+    insObjs.push({t:'red',l:'⏰ High Placement Delay',m:`Avg placement delay is ${avgPD.toFixed(1)} days — above 2-day threshold.`,
+      logic:'Rows where Act. Placement Date − Indent Date > 0 days.',
+      rows: d.filter(r=>r._placementDelay!==null&&r._placementDelay>0)});
   else if (avgPD > 1)
-    ins.push({t:'amber',l:'⚠ Placement Delay',m:`Avg placement delay of ${avgPD.toFixed(1)} days is slightly above 1-day benchmark.`});
+    insObjs.push({t:'amber',l:'⚠ Placement Delay',m:`Avg placement delay of ${avgPD.toFixed(1)} days is slightly above 1-day benchmark.`,
+      logic:'Rows where Act. Placement Date − Indent Date > 0 days.',
+      rows: d.filter(r=>r._placementDelay!==null&&r._placementDelay>0)});
   else
-    ins.push({t:'green',l:'✅ Placement On Track',m:`Avg placement delay of ${avgPD.toFixed(1)} days — within acceptable range.`});
+    insObjs.push({t:'green',l:'✅ Placement On Track',m:`Avg placement delay of ${avgPD.toFixed(1)} days — within acceptable range.`,
+      logic:'All rows with both Indent Date and Act. Placement Date.',
+      rows: d.filter(r=>r._indentDate&&r._actPlacement)});
 
   // Top delay transporter
-  const tMap = {};
-  d.filter(r=>r._transporter&&r._placementDelay!==null).forEach(r=>{ if(!tMap[r._transporter]) tMap[r._transporter]=[]; tMap[r._transporter].push(r._placementDelay); });
-  const tRank = Object.entries(tMap).filter(([,v])=>v.length>=2).map(([k,v])=>[k,safeAvg(v),v.length]).sort((a,b)=>b[1]-a[1]);
+  const tMapI = {};
+  d.filter(r=>r._transporter&&r._placementDelay!==null).forEach(r=>{ if(!tMapI[r._transporter]) tMapI[r._transporter]=[]; tMapI[r._transporter].push(r._placementDelay); });
+  const tRank = Object.entries(tMapI).filter(([,v])=>v.length>=2).map(([k,v])=>[k,safeAvg(v),v.length]).sort((a,b)=>b[1]-a[1]);
   if (tRank.length) {
     const [tp,delay,cnt] = tRank[0];
-    ins.push({t:delay>3?'red':'amber',l:'🚛 Top Delay Transporter',m:`${tp.slice(0,40)} — avg placement delay ${delay.toFixed(1)}d across ${cnt} shipments.`});
+    insObjs.push({t:delay>3?'red':'amber',l:'🚛 Top Delay Transporter',m:`${tp.slice(0,40)} — avg placement delay ${delay.toFixed(1)}d across ${cnt} shipments.`,
+      logic:`Rows where Transporter = "${tp}" and Placement Delay > 0.`,
+      rows: d.filter(r=>r._transporter===tp&&r._placementDelay!==null)});
   }
 
   // Top detention route
-  const rDet = {};
-  d.filter(r=>r._totalDetention>0).forEach(r=>{ const k=`${r._from} → ${r._to}`; rDet[k]=(rDet[k]||0)+r._totalDetention; });
-  const topDR = Object.entries(rDet).sort((a,b)=>b[1]-a[1])[0];
-  if (topDR) ins.push({t:'amber',l:'🗺 Highest Detention Route',m:`${topDR[0]} — total ${topDR[1]} detention days. Review loading/unloading processes.`});
+  const rDetI = {};
+  d.filter(r=>r._totalDetention>0).forEach(r=>{ const k=`${r._from} → ${r._to}`; rDetI[k]=(rDetI[k]||0)+r._totalDetention; });
+  const topDRI = Object.entries(rDetI).sort((a,b)=>b[1]-a[1])[0];
+  if (topDRI) insObjs.push({t:'amber',l:'🗺 Highest Detention Route',m:`${topDRI[0]} — total ${topDRI[1]} detention days.`,
+    logic:`Rows on route "${topDRI[0]}" with total detention > 0.`,
+    rows: d.filter(r=>`${r._from} → ${r._to}`===topDRI[0]&&r._totalDetention>0)});
 
   if (pctDet > 20)
-    ins.push({t:'red',l:'📦 High Detention Rate',m:`${pctDet.toFixed(1)}% of shipments (${withDet}) carry detention charges. Negotiate improved free-day norms.`});
+    insObjs.push({t:'red',l:'📦 High Detention Rate',m:`${pctDet.toFixed(1)}% of shipments (${withDet}) carry detention charges.`,
+      logic:'Rows where Origin Detention + Destination Detention > 0 days.',
+      rows: d.filter(r=>r._totalDetention>0)});
   else if (pctDet > 0)
-    ins.push({t:'green',l:'📦 Detention Under Control',m:`Only ${pctDet.toFixed(1)}% of shipments have detention. Continue monitoring.`});
+    insObjs.push({t:'green',l:'📦 Detention Under Control',m:`Only ${pctDet.toFixed(1)}% of shipments have detention.`,
+      logic:'Rows where Origin Detention + Destination Detention > 0 days.',
+      rows: d.filter(r=>r._totalDetention>0)});
 
   if (totalFreight > 0)
-    ins.push({t:'green',l:'💰 Freight Summary',m:`Total freight in filtered view: ${fmtMoney(totalFreight)} across ${total} shipments (avg ${fmtMoney(totalFreight/total)}/ship).`});
+    insObjs.push({t:'green',l:'💰 Freight Summary',m:`Total freight: ${fmtMoney(totalFreight)} across ${total} shipments (avg ${fmtMoney(totalFreight/total)}/ship).`,
+      logic:'All rows in the filtered dataset.',
+      rows: d});
+
+  window._insightSets = insObjs.slice(0,6);
 
   document.getElementById('insight-meta').textContent = `${total} shipments analyzed`;
-  document.getElementById('insights-grid').innerHTML = ins.slice(0,6).map(i =>
-    `<div class="insight-card ${i.t}"><div class="insight-dot ${i.t}"></div>
-     <div><div class="insight-label ${i.t}">${i.l}</div><div class="insight-text">${i.m}</div></div></div>`
+  document.getElementById('insights-grid').innerHTML = insObjs.slice(0,6).map((i,idx) =>
+    `<div class="insight-card ${i.t}" style="cursor:pointer;" data-insight-idx="${idx}"
+      title="Logic: ${i.logic.replace(/"/g,'&quot;')}">
+      <div class="insight-dot ${i.t}"></div>
+      <div>
+        <div class="insight-label ${i.t}">${i.l}</div>
+        <div class="insight-text">${i.m}</div>
+        <div style="font-size:9px;color:var(--text4);margin-top:3px;font-style:italic;">Logic: ${i.logic}</div>
+        <div style="font-size:9px;color:var(--teal);margin-top:3px;font-weight:600;">↗ Click to see ${i.rows.length} contributing rows</div>
+      </div>
+    </div>`
   ).join('');
 }
 
@@ -1667,26 +1866,52 @@ function renderBottlenecks() {
   const d = filteredData;
   const ind=d.length, plc=d.filter(r=>r._actPlacement).length, dis=d.filter(r=>r._dispatch).length, del=d.filter(r=>r._unloading).length;
   const drops=[
-    {l:'Indent → Placed',  drop:ind-plc, pct:ind?((ind-plc)/ind*100).toFixed(1):0},
-    {l:'Placed → Dispatched',drop:plc-dis,pct:plc?((plc-dis)/plc*100).toFixed(1):0},
-    {l:'Dispatched → Delivered',drop:dis-del,pct:dis?((dis-del)/dis*100).toFixed(1):0},
+    {l:'Indent → Placed',  drop:ind-plc, pct:ind?((ind-plc)/ind*100).toFixed(1):0,
+     rows:d.filter(r=>!r._actPlacement)},
+    {l:'Placed → Dispatched',drop:plc-dis,pct:plc?((plc-dis)/plc*100).toFixed(1):0,
+     rows:d.filter(r=>r._actPlacement&&!r._dispatch)},
+    {l:'Dispatched → Delivered',drop:dis-del,pct:dis?((dis-del)/dis*100).toFixed(1):0,
+     rows:d.filter(r=>r._dispatch&&!r._unloading)},
   ].sort((a,b)=>b.drop-a.drop);
 
   const rMap={};
-  d.filter(r=>r._from&&r._to&&r._placementDelay!==null).forEach(r=>{ const k=`${r._from}→${r._to}`; if(!rMap[k]) rMap[k]=[]; rMap[k].push(r._placementDelay); });
-  const routeTop = Object.entries(rMap).map(([k,v])=>[k,safeAvg(v),v.length]).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  d.filter(r=>r._from&&r._to&&r._placementDelay!==null).forEach(r=>{ const k=`${r._from}→${r._to}`; if(!rMap[k]) rMap[k]=[]; rMap[k].push(r); });
+  const routeTop = Object.entries(rMap).map(([k,v])=>[k,safeAvg(v.map(r=>r._placementDelay)),v.length,v]).sort((a,b)=>b[1]-a[1]).slice(0,5);
 
   const tMap={};
-  d.filter(r=>r._transporter&&r._placementDelay!==null).forEach(r=>{ if(!tMap[r._transporter]) tMap[r._transporter]=[]; tMap[r._transporter].push(r._placementDelay); });
-  const tpTop = Object.entries(tMap).map(([k,v])=>[k,safeAvg(v),v.length]).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  d.filter(r=>r._transporter&&r._placementDelay!==null).forEach(r=>{ if(!tMap[r._transporter]) tMap[r._transporter]=[]; tMap[r._transporter].push(r); });
+  const tpTop = Object.entries(tMap).map(([k,v])=>[k,safeAvg(v.map(r=>r._placementDelay)),v.length,v]).sort((a,b)=>b[1]-a[1]).slice(0,5);
 
   const vc = v => v>5?'bad':v>2?'mid':'ok';
   const dc = v => parseFloat(v)>30?'bad':parseFloat(v)>15?'mid':'ok';
 
+  // Store bottleneck drill data
+  window._bnDropRows   = drops;
+  window._bnRouteRows  = routeTop;
+  window._bnTransRows  = tpTop;
+
   document.getElementById('bottleneck-grid').innerHTML =
-    `<div class="bottleneck-card"><div class="bn-title">🔽 Stage Drop-off</div>${drops.map(s=>`<div class="bn-row"><div class="bn-name">${s.l}</div><div class="bn-val ${dc(s.pct)}">${s.drop} (${s.pct}%)</div></div>`).join('')}</div>` +
-    `<div class="bottleneck-card"><div class="bn-title">🗺 Routes — Highest Placement Delay</div>${routeTop.length?routeTop.map(([r,a,c])=>`<div class="bn-row"><div class="bn-name" title="${r}">${r.length>28?r.slice(0,26)+'…':r}</div><div class="bn-val ${vc(a)}">${a.toFixed(1)}d <span style="font-size:9px;color:var(--text4)">(${c})</span></div></div>`).join(''):'<div class="no-data" style="padding:8px">No data</div>'}</div>` +
-    `<div class="bottleneck-card"><div class="bn-title">🚛 Transporters — Highest Avg Delay</div>${tpTop.length?tpTop.map(([t,a,c])=>`<div class="bn-row"><div class="bn-name" title="${t}">${t.length>22?t.slice(0,20)+'…':t}</div><div class="bn-val ${vc(a)}">${a.toFixed(1)}d <span style="font-size:9px;color:var(--text4)">(${c})</span></div></div>`).join(''):'<div class="no-data" style="padding:8px">No data</div>'}</div>`;
+    `<div class="bottleneck-card">
+      <div class="bn-title">🔽 Stage Drop-off</div>
+      ${drops.map((s,i)=>`<div class="bn-row" style="cursor:pointer;" onclick="drillOpen('Drop-off: ${s.l}',window._bnDropRows[${i}].rows)">
+        <div class="bn-name" title="Click to drill">${s.l}</div>
+        <div class="bn-val ${dc(s.pct)}">${s.drop} (${s.pct}%)</div>
+      </div>`).join('')}
+    </div>` +
+    `<div class="bottleneck-card">
+      <div class="bn-title">🗺 Routes — Highest Placement Delay</div>
+      ${routeTop.length ? routeTop.map(([r,a,c,rows],i)=>`<div class="bn-row" style="cursor:pointer;" onclick="drillOpen('Route: ${r.replace(/'/g,"\\'")}',window._bnRouteRows[${i}][3])">
+        <div class="bn-name" title="${r} · Click to drill">${r.length>28?r.slice(0,26)+'…':r}</div>
+        <div class="bn-val ${vc(a)}">${a.toFixed(1)}d <span style="font-size:9px;color:var(--text4)">(${c})</span></div>
+      </div>`).join('') : '<div class="no-data" style="padding:8px">No data</div>'}
+    </div>` +
+    `<div class="bottleneck-card">
+      <div class="bn-title">🚛 Transporters — Highest Avg Delay</div>
+      ${tpTop.length ? tpTop.map(([t,a,c,rows],i)=>`<div class="bn-row" style="cursor:pointer;" onclick="drillOpen('Transporter: ${t.replace(/'/g,"\\'")}',window._bnTransRows[${i}][3])">
+        <div class="bn-name" title="${t} · Click to drill">${t.length>22?t.slice(0,20)+'…':t}</div>
+        <div class="bn-val ${vc(a)}">${a.toFixed(1)}d <span style="font-size:9px;color:var(--text4)">(${c})</span></div>
+      </div>`).join('') : '<div class="no-data" style="padding:8px">No data</div>'}
+    </div>`;
 }
 
 // ════════════════════════════════════════════════════════════
@@ -1752,6 +1977,14 @@ function renderTrends() {
 
   makeLineChart('chart-cost', labels, [
     { label:'Total Freight (₹)', data: vals.map(g=>safeSum(g.map(r=>r._freight))) },
+  ]);
+
+  // Cost per MW trend
+  makeLineChart('chart-costmw', labels, [
+    { label:'Avg ₹/MW', data: vals.map(g => {
+      const rows = g.filter(r => r._mw > 0 && r._costPerMW > 0);
+      return rows.length ? Math.round(safeAvg(rows.map(r => r._costPerMW))) : 0;
+    })},
   ]);
 }
 
@@ -1933,6 +2166,157 @@ function renderDataTable() {
       </tr>`).join('')
     : `<tr><td colspan="15" class="no-data">No records match current filters.</td></tr>`;
 }
+
+// ════════════════════════════════════════════════════════════
+// DRILL-THROUGH TABLE
+// ════════════════════════════════════════════════════════════
+let _drillRows = [];
+let _drillSearch = '';
+let _drillSortKey = '';
+let _drillSortDir = 1;
+
+// Event delegation: insight card clicks
+document.addEventListener('click', e => {
+  const insCard = e.target.closest('[data-insight-idx]');
+  if (insCard && !e.target.closest('.kpi-card')) {
+    const idx = parseInt(insCard.getAttribute('data-insight-idx'), 10);
+    const set = window._insightSets && window._insightSets[idx];
+    if (set) drillOpen(set.l, set.rows || filteredData);
+  }
+});
+
+// All display columns (skip internal _ keys)
+const DRILL_COLS = [
+  'Sl No','Indent Date','Indent Time','Req. Placement Date','Confirmation Placement Date',
+  'Act. Placement Date','Dispatch Date','Actual Reporting At Destination',
+  'Unloading/Release at Destination','VSLL Billing Customer','Consignee Name',
+  'From','To','Veh. Type','Veh. No.','LR No./ Shipment No.','Transporter Name',
+  'THC (Rs.)','Total Freight (Rs.)','Total Wp','Remarks','Current Location',
+  '_status','_tripType','_placementDelay','_dispatchDelay','_transitTime',
+  '_totalDetention','_freight','_thc','_costPerMW'
+];
+
+const DRILL_LABELS = {
+  '_status':'Status','_tripType':'Trip Type','_placementDelay':'Plcmt Delay(d)',
+  '_dispatchDelay':'Disp Delay(d)','_transitTime':'Transit(d)',
+  '_totalDetention':'Detention(d)','_freight':'Freight(₹)','_thc':'THC(₹)',
+  '_costPerMW':'₹/MW'
+};
+
+// ════════════════════════════════════════════════════════════
+// DRILL-DOWN — INLINE TABLE (no popup)
+// ════════════════════════════════════════════════════════════
+let _lastScrollY = 0; // remember scroll position for Back to Dashboard
+
+function drillOpen(title, rows) {
+  _drillRows = Array.isArray(rows) ? rows : [];
+  _drillSearch = '';
+  _drillSortKey = '';
+  _drillSortDir = -1;
+
+  // Remember scroll position so back button can return
+  _lastScrollY = window.scrollY;
+
+  // Show UI elements
+  document.getElementById('drill-bar').style.display = 'flex';
+  document.getElementById('drill-toolbar').style.display = 'flex';
+  document.getElementById('drill-hint').style.display = 'none';
+  document.getElementById('drill-table-wrap').style.display = 'block';
+
+  document.getElementById('drill-title').textContent = '🔍 ' + title;
+  document.getElementById('drill-search').value = '';
+
+  renderDrillTable();
+
+  // Smooth scroll to drill section
+  const sec = document.getElementById('drill-section');
+  if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function drillBack() {
+  // Smooth scroll back to last position
+  window.scrollTo({ top: _lastScrollY, behavior: 'smooth' });
+}
+
+function drillSearch(val) {
+  _drillSearch = val.toLowerCase();
+  renderDrillTable();
+}
+
+function drillSort(key) {
+  if (_drillSortKey === key) _drillSortDir *= -1;
+  else { _drillSortKey = key; _drillSortDir = 1; }
+  renderDrillTable();
+}
+
+function renderDrillTable() {
+  let rows = _drillRows;
+
+  // Search across all columns
+  if (_drillSearch) {
+    rows = rows.filter(r =>
+      DRILL_COLS.some(col => {
+        const v = r[col];
+        return v !== null && v !== undefined && String(v).toLowerCase().includes(_drillSearch);
+      })
+    );
+  }
+
+  // Sort
+  if (_drillSortKey) {
+    rows = [...rows].sort((a, b) => {
+      const av = a[_drillSortKey], bv = b[_drillSortKey];
+      if (av == null) return 1; if (bv == null) return -1;
+      const an = parseFloat(av), bn = parseFloat(bv);
+      if (!isNaN(an) && !isNaN(bn)) return _drillSortDir * (an - bn);
+      return _drillSortDir * String(av).localeCompare(String(bv));
+    });
+  }
+
+  document.getElementById('drill-count').textContent = `${rows.length.toLocaleString('en-IN')} rows`;
+  document.getElementById('drill-subtitle').textContent =
+    `${_drillRows.length} total · ${rows.length} shown${_drillSearch ? ' (filtered)' : ''}`;
+
+  // Header
+  document.getElementById('drill-thead').innerHTML = '<tr>' + DRILL_COLS.map(col => {
+    const lbl = DRILL_LABELS[col] || col;
+    const sortInd = _drillSortKey === col ? (_drillSortDir > 0 ? ' ↑' : ' ↓') : '';
+    return `<th onclick="drillSort('${col.replace(/'/g,"\'")}')">` +
+      (lbl.length > 20 ? lbl.slice(0,18)+'…' : lbl) + sortInd + '</th>';
+  }).join('') + '</tr>';
+
+  // Body (max 1000 rows)
+  document.getElementById('drill-tbody').innerHTML = rows.slice(0, 1000).map(r => '<tr>' + DRILL_COLS.map(col => {
+    let v = r[col];
+    if (v instanceof Date) v = v.toLocaleDateString('en-IN', {day:'2-digit',month:'short',year:'2-digit'});
+    else if (v === null || v === undefined) v = '—';
+    else if (col === '_freight' || col === '_thc') v = v > 0 ? '₹' + Math.round(v).toLocaleString('en-IN') : '—';
+    else if (col === '_costPerMW') v = v > 0 ? '₹' + Math.round(v).toLocaleString('en-IN') : '—';
+    else v = String(v).slice(0, 60);
+    return `<td>${v}</td>`;
+  }).join('') + '</tr>').join('') ||
+    '<tr><td colspan="' + DRILL_COLS.length + '" style="text-align:center;padding:30px;color:#6a9e94;font-style:italic;">No matching rows</td></tr>';
+}
+
+function exportDrillCSV() {
+  if (!_drillRows.length) return;
+  const headers = DRILL_COLS.map(c => DRILL_LABELS[c] || c);
+  const rows = _drillRows.map(r =>
+    DRILL_COLS.map(col => {
+      let v = r[col];
+      if (v instanceof Date) return v.toLocaleDateString('en-IN');
+      if (v === null || v === undefined) return '';
+      return '"' + String(v).replace(/"/g,'""') + '"';
+    }).join(',')
+  );
+  const csv = [headers.join(','), ...rows].join('\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url;
+  a.download = 'vsl_drill_' + Date.now() + '.csv';
+  a.click(); URL.revokeObjectURL(url);
+}
+
 </script>
 </body>
 </html>
