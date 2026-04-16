@@ -674,7 +674,7 @@ tr:hover td{background:rgba(26,122,110,.06);color:#0d2420;}
       <div class="chart-canvas-wrap"><canvas id="chart-cost"></canvas></div>
     </div>
     <div class="chart-card">
-      <div class="chart-header"><div class="chart-title">Avg Cost per MW (₹/MW)</div></div>
+      <div class="chart-header"><div class="chart-title">Avg Cost per Wp (₹/Wp)</div></div>
       <div class="chart-canvas-wrap"><canvas id="chart-costmw"></canvas></div>
     </div>
   </div>
@@ -1104,11 +1104,10 @@ function parseRow(r) {
   else if (status === 'IN_TRANSIT') currentLocation = String(r['Current Location'] || 'In Transit').trim() || 'In Transit';
   else currentLocation = '—';
 
-  // Cost/MW calculation — Step 1: MWp = Total Wp / 1,000,000; Step 2: Cost per MWp = THC / MWp
-  const thc    = cleanNum(r['THC (Rs.)']);
-  const totalWp = cleanNum(r['Total Wp']);
-  const mw      = totalWp > 0 ? totalWp / 1000000 : 0; // Convert Wp → MWp
-  const costPerMW = mw > 0 ? thc / mw : 0;             // ₹ per MWp
+  // Cost/Wp calculation: Cost per Wp = THC / Total Wp (no MW conversion)
+  const thc      = cleanNum(r['THC (Rs.)']);
+  const totalWp  = cleanNum(r['Total Wp']);
+  const costPerWp = totalWp > 0 ? thc / totalWp : 0;   // ₹ per Wp
 
   return {
     ...r,
@@ -1122,8 +1121,7 @@ function parseRow(r) {
     _freight: cleanNum(r['Total Freight (Rs.)']),
     _thc: thc,
     _totalWp: totalWp,
-    _mw: mw,
-    _costPerMW: costPerMW,
+    _costPerWp: costPerWp,
     _from: String(r['From'] || '').trim(),
     _to: String(r['To'] || '').trim(),
     _transporter: String(r['Transporter Name'] || '').trim(),
@@ -1161,15 +1159,16 @@ function buildMultiSelect(containerId, stateKey, options, ph = 'All') {
 }
 
 function renderMSOpts(id, stateKey, options, search) {
-  const state = msState[stateKey];
+  // msState stores EXCLUDED values; empty set = all shown (all checked)
+  const excluded = msState[stateKey];
   const el = document.getElementById(id + '-opts');
   if (!el) return;
   const filt = options.filter(o => !search || String(o).toLowerCase().includes(search.toLowerCase()));
   el.innerHTML = filt.map(o => {
     const trimmed = String(o).trim();
     const v = trimmed.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-    // checked when: nothing selected (show all) OR this value is in the selected set
-    const chk = state.size === 0 || state.has(trimmed) ? 'checked' : '';
+    // checked when NOT in excluded set
+    const chk = !excluded.has(trimmed) ? 'checked' : '';
     return `<div class="ms-option" onclick="toggleMSOpt('${id}','${stateKey}','${v}')">
       <input type="checkbox" ${chk} onclick="event.stopPropagation();toggleMSOpt('${id}','${stateKey}','${v}')">
       <span>${o}</span></div>`;
@@ -1182,36 +1181,64 @@ function phText(sk) {
 }
 
 function updateMSLabel(id, stateKey) {
-  const st = msState[stateKey], el = document.getElementById(id + '-label');
+  const excluded = msState[stateKey], el = document.getElementById(id + '-label');
   if (!el) return;
-  el.textContent = st.size === 0 ? phText(stateKey) : st.size === 1 ? [...st][0] : `${st.size} selected`;
+  const allOpts = _msOptions[stateKey] || [];
+  const includedCount = allOpts.length - excluded.size;
+  if (excluded.size === 0) {
+    el.textContent = phText(stateKey); // All selected
+  } else if (excluded.size === allOpts.length) {
+    el.textContent = 'None selected';
+  } else {
+    el.textContent = `${includedCount} of ${allOpts.length} selected`;
+  }
   const a = document.getElementById(id + '-all');
-  if (a) a.checked = st.size === 0;
+  if (a) a.checked = excluded.size === 0;
 }
 
 function toggleMSOpt(id, stateKey, val) {
-  const st = msState[stateKey];
+  // msState stores EXCLUDED values; toggle item in/out of exclusion set
+  const excluded = msState[stateKey];
   const trimmedVal = String(val).trim();
-  if (st.has(trimmedVal)) {
-    st.delete(trimmedVal);
+  if (excluded.has(trimmedVal)) {
+    excluded.delete(trimmedVal); // was excluded → now included (re-check)
   } else {
-    st.add(trimmedVal);
+    excluded.add(trimmedVal);    // was included → now excluded (uncheck)
   }
-  // Update checkbox states
+  // Sync checkboxes: checked = NOT excluded
   const optsEl = document.getElementById(id + '-opts');
   if (optsEl) {
     optsEl.querySelectorAll('.ms-option').forEach(op => {
       const span = op.querySelector('span');
       const cb   = op.querySelector('input');
-      if (cb && span) cb.checked = st.size === 0 || st.has(String(span.textContent).trim());
+      if (cb && span) cb.checked = !excluded.has(String(span.textContent).trim());
     });
   }
+  // Sync Select All checkbox: checked only when nothing is excluded
+  const allCb = document.getElementById(id + '-all');
+  if (allCb) allCb.checked = excluded.size === 0;
   updateMSLabel(id, stateKey);
 }
 function toggleMSAll(id, stateKey) {
-  msState[stateKey].clear();
-  const wrap = document.getElementById('ms-' + stateKey);
-  if (wrap) wrap.querySelectorAll('#' + id + '-opts input[type=checkbox]').forEach(c => c.checked = true);
+  const excluded = msState[stateKey];
+  const opts = _msOptions[stateKey] || [];
+  if (excluded.size === 0) {
+    // All currently shown → exclude all (deselect all)
+    opts.forEach(o => excluded.add(String(o).trim()));
+  } else {
+    // Some/all excluded → clear exclusions (select all)
+    excluded.clear();
+  }
+  const optsEl = document.getElementById(id + '-opts');
+  if (optsEl) {
+    optsEl.querySelectorAll('.ms-option').forEach(op => {
+      const span = op.querySelector('span');
+      const cb   = op.querySelector('input');
+      if (cb && span) cb.checked = !excluded.has(String(span.textContent).trim());
+    });
+  }
+  const allCb = document.getElementById(id + '-all');
+  if (allCb) allCb.checked = excluded.size === 0;
   updateMSLabel(id, stateKey);
 }
 function filterMSOpts(id, stateKey, s) {
@@ -1290,28 +1317,22 @@ function applyFilters() {
   const from  = document.getElementById('f-date-from').value ? new Date(document.getElementById('f-date-from').value) : null;
   const toVal = document.getElementById('f-date-to').value   ? new Date(document.getElementById('f-date-to').value + 'T23:59:59') : null;
 
-  // Pre-normalize set values for vehType and tripType to avoid whitespace/case mismatch
-  const vehSet  = new Set([...msState.vehType].map(v  => String(v).trim()));
-  const tripSet = new Set([...msState.tripType].map(v => String(v).trim()));
+  // Pre-normalize excluded sets for vehType and tripType
+  const vehExcluded  = new Set([...msState.vehType].map(v  => String(v).trim()));
+  const tripExcluded = new Set([...msState.tripType].map(v => String(v).trim()));
 
   filteredData = rawData.filter(r => {
     const df = getDateField(r);
     if (from  && (!df || df < from))  return false;
     if (toVal && (!df || df > toVal)) return false;
-    // Customer — IN logic
-    if (msState.customer.size    > 0 && !msState.customer.has(r._customer))       return false;
-    // From — IN logic
-    if (msState.from.size        > 0 && !msState.from.has(r._from))               return false;
-    // To — IN logic
-    if (msState.to.size          > 0 && !msState.to.has(r._to))                   return false;
-    // Transporter — IN logic
-    if (msState.transporter.size > 0 && !msState.transporter.has(r._transporter)) return false;
-    // Vehicle Type — IN logic (normalised)
-    if (vehSet.size > 0 && !vehSet.has(String(r._vehType || '').trim()))          return false;
-    // Status — IN logic
-    if (msState.status.size      > 0 && !msState.status.has(r._status))           return false;
-    // Trip Type — IN logic (normalised)
-    if (tripSet.size > 0 && !tripSet.has(String(r._tripType || '').trim()))       return false;
+    // EXCLUSION logic: if excluded set non-empty, hide rows whose value IS in the excluded set
+    if (msState.customer.size    > 0 && msState.customer.has(r._customer))       return false;
+    if (msState.from.size        > 0 && msState.from.has(r._from))               return false;
+    if (msState.to.size          > 0 && msState.to.has(r._to))                   return false;
+    if (msState.transporter.size > 0 && msState.transporter.has(r._transporter)) return false;
+    if (vehExcluded.size  > 0 && vehExcluded.has(String(r._vehType || '').trim()))   return false;
+    if (msState.status.size      > 0 && msState.status.has(r._status))           return false;
+    if (tripExcluded.size > 0 && tripExcluded.has(String(r._tripType || '').trim())) return false;
     // Cross-filters
     if (crossFilter.transporter && r._transporter !== crossFilter.transporter) return false;
     if (crossFilter.vehicle     && r._vehType     !== crossFilter.vehicle)     return false;
@@ -1343,8 +1364,9 @@ function renderFilterTags() {
 
   // Helper: build one tag per selected value in a msState key
   const addTags = (stateKey, labelPrefix) => {
+    // msState stores EXCLUDED values — show them as 'hidden' tags
     msState[stateKey].forEach(val => {
-      parts.push({ label: `${labelPrefix}: ${val}`, stateKey, val });
+      parts.push({ label: `Hide ${labelPrefix}: ${val}`, stateKey, val });
     });
   };
 
@@ -1383,7 +1405,7 @@ function removeFilterTag(idx) {
   if (p.cfKey) {
     crossFilter[p.cfKey] = null;
   } else if (p.stateKey && p.val !== undefined) {
-    msState[p.stateKey].delete(p.val);
+    msState[p.stateKey].delete(p.val); // remove from exclusion set (re-include this value)
     // Resolve the correct ms-id (same logic as buildMultiSelect: id = 'ms-' + stateKey)
     const msId = 'ms-' + p.stateKey;
     const optsEl = document.getElementById(msId + '-opts');
@@ -1435,13 +1457,13 @@ function renderYTDKPIs() {
   const tripSet = new Set([...msState.tripType].map(v => String(v).trim()));
 
   const d = rawData.filter(r => {
-    if (msState.customer.size    > 0 && !msState.customer.has(r._customer))       return false;
-    if (msState.from.size        > 0 && !msState.from.has(r._from))               return false;
-    if (msState.to.size          > 0 && !msState.to.has(r._to))                   return false;
-    if (msState.transporter.size > 0 && !msState.transporter.has(r._transporter)) return false;
-    if (vehSet.size  > 0 && !vehSet.has(String(r._vehType || '').trim()))         return false;
-    if (msState.status.size      > 0 && !msState.status.has(r._status))           return false;
-    if (tripSet.size > 0 && !tripSet.has(String(r._tripType || '').trim()))       return false;
+    if (msState.customer.size    > 0 && msState.customer.has(r._customer))       return false;
+    if (msState.from.size        > 0 && msState.from.has(r._from))               return false;
+    if (msState.to.size          > 0 && msState.to.has(r._to))                   return false;
+    if (msState.transporter.size > 0 && msState.transporter.has(r._transporter)) return false;
+    if (vehSet.size  > 0 && vehSet.has(String(r._vehType || '').trim()))         return false;
+    if (msState.status.size      > 0 && msState.status.has(r._status))           return false;
+    if (tripSet.size > 0 && tripSet.has(String(r._tripType || '').trim()))       return false;
     if (crossFilter.transporter && r._transporter !== crossFilter.transporter) return false;
     if (crossFilter.vehicle     && r._vehType     !== crossFilter.vehicle)     return false;
     if (crossFilter.customer    && r._customer    !== crossFilter.customer)    return false;
@@ -1580,12 +1602,12 @@ function renderKPIs() {
     kpiCard('⚠','% With Detention',fmtN(parseFloat(pctDet),1),'%',`${withDet} shipments`,parseFloat(pctDet)>20?'danger':'warning',
       `drillOpen('Shipments With Detention',filteredData.filter(r=>r._totalDetention>0))`);
 
-  // COST — THC & Cost/MW only (Freight KPIs removed per requirements)
+  // COST — THC & Cost/Wp
   const totalTHC  = safeSum(d.map(r => r._thc));
   const avgTHC    = total ? totalTHC / total : 0;
-  // Cost/MW
-  const mwRows = d.filter(r => r._mw > 0 && r._costPerMW > 0);
-  const avgCostMW = mwRows.length ? safeAvg(mwRows.map(r => r._costPerMW)) : 0;
+  // Cost per Wp (no MW conversion)
+  const wpRows    = d.filter(r => r._costPerWp > 0);
+  const avgCostWp = wpRows.length ? safeAvg(wpRows.map(r => r._costPerWp)) : 0;
 
   document.getElementById('kpi-cost').innerHTML =
     kpiCard('🧾','Total THC',fmtMoney(totalTHC),'','Sum of THC (Rs.) — filtered dataset','',
@@ -1594,9 +1616,10 @@ function renderKPIs() {
       avgTHC > 0 ? '₹' + avgTHC.toLocaleString('en-IN',{maximumFractionDigits:2,minimumFractionDigits:2}) : '₹0',
       '','Total THC ÷ Number of Shipments','',
       `drillOpen('Avg THC per Shipment',filteredData)`) +
-    kpiCard('⚡','Avg Cost/MW',avgCostMW>0?'₹'+Math.round(avgCostMW).toLocaleString('en-IN'):'—','',
-      `THC ÷ MWp · ${mwRows.length} rows with Wp data`,'info',
-      `drillOpen('Cost per MW',filteredData.filter(r=>r._mw>0))`);
+    kpiCard('⚡','Avg Cost/Wp',
+      avgCostWp > 0 ? '₹' + avgCostWp.toFixed(4) : '—','',
+      `THC ÷ Wp · ${wpRows.length} rows with Wp data`,'info',
+      `drillOpen('Cost per Wp',filteredData.filter(r=>r._costPerWp>0))`);
 }
 
 // ════════════════════════════════════════════════════════════
@@ -1979,11 +2002,11 @@ function renderTrends() {
     { label:'Total Freight (₹)', data: vals.map(g=>safeSum(g.map(r=>r._freight))) },
   ]);
 
-  // Cost per MW trend
+  // Cost per Wp trend
   makeLineChart('chart-costmw', labels, [
-    { label:'Avg ₹/MW', data: vals.map(g => {
-      const rows = g.filter(r => r._mw > 0 && r._costPerMW > 0);
-      return rows.length ? Math.round(safeAvg(rows.map(r => r._costPerMW))) : 0;
+    { label:'Avg ₹/Wp', data: vals.map(g => {
+      const rows = g.filter(r => r._costPerWp > 0);
+      return rows.length ? +safeAvg(rows.map(r => r._costPerWp)).toFixed(4) : 0;
     })},
   ]);
 }
@@ -2193,14 +2216,14 @@ const DRILL_COLS = [
   'From','To','Veh. Type','Veh. No.','LR No./ Shipment No.','Transporter Name',
   'THC (Rs.)','Total Freight (Rs.)','Total Wp','Remarks','Current Location',
   '_status','_tripType','_placementDelay','_dispatchDelay','_transitTime',
-  '_totalDetention','_freight','_thc','_costPerMW'
+  '_totalDetention','_freight','_thc','_costPerWp'
 ];
 
 const DRILL_LABELS = {
   '_status':'Status','_tripType':'Trip Type','_placementDelay':'Plcmt Delay(d)',
   '_dispatchDelay':'Disp Delay(d)','_transitTime':'Transit(d)',
   '_totalDetention':'Detention(d)','_freight':'Freight(₹)','_thc':'THC(₹)',
-  '_costPerMW':'₹/MW'
+  '_costPerWp':'₹/Wp'
 };
 
 // ════════════════════════════════════════════════════════════
@@ -2291,7 +2314,7 @@ function renderDrillTable() {
     if (v instanceof Date) v = v.toLocaleDateString('en-IN', {day:'2-digit',month:'short',year:'2-digit'});
     else if (v === null || v === undefined) v = '—';
     else if (col === '_freight' || col === '_thc') v = v > 0 ? '₹' + Math.round(v).toLocaleString('en-IN') : '—';
-    else if (col === '_costPerMW') v = v > 0 ? '₹' + Math.round(v).toLocaleString('en-IN') : '—';
+    else if (col === '_costPerWp') v = v > 0 ? '₹' + (+v).toFixed(4) : '—';
     else v = String(v).slice(0, 60);
     return `<td>${v}</td>`;
   }).join('') + '</tr>').join('') ||
