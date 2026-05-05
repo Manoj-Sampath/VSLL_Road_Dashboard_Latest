@@ -6,6 +6,7 @@
 <title>VSL Logistics Dashboard</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -150,7 +151,25 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-
 .btn-upload:hover{background:rgba(155,197,61,.1);}
 .btn-clear{background:var(--glass);color:var(--red);border:1px solid rgba(255,107,107,.25);}
 .btn-clear:hover{background:rgba(255,107,107,.1);}
+/* ── COMPARISON MODE ─────────────────────────── */
+
+.kpi-cmp{display:flex;align-items:baseline;gap:5px;margin-top:3px;flex-wrap:wrap;}
+.kpi-cmp-ly{font-size:11px;color:rgba(255,255,255,.45);font-family:'Poppins',sans-serif;}
+.kpi-cmp-delta{font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;}
+.kpi-cmp-delta.up{background:rgba(192,57,43,.25);color:#ffb3b3;}
+.kpi-cmp-delta.dn{background:rgba(90,138,24,.3);color:#c5f078;}
+.kpi-cmp-delta.neu{background:rgba(255,255,255,.1);color:rgba(255,255,255,.45);}
+
+/* ── COLLAPSIBLE FILTER TAGS ─────────────────── */
 .filter-info{font-size:10.5px;color:var(--text3);padding:6px 0 0;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+/* Filter tags bar */
+#filter-tags{transition:max-height .3s ease;overflow:hidden;}
+#filter-tags-status{font-size:10px;font-weight:600;color:var(--teal);white-space:nowrap;flex-shrink:0;}
+
+.filter-tags-inner{display:flex;flex-wrap:wrap;gap:6px;}
+.filter-toggle-btn{font-size:10px;color:var(--teal);font-weight:600;cursor:pointer;white-space:nowrap;padding:2px 8px;border-radius:10px;border:1px solid rgba(26,122,110,.22);background:rgba(26,122,110,.06);transition:all .2s;flex-shrink:0;align-self:flex-start;margin-top:1px;}
+.filter-toggle-btn:hover{background:rgba(26,122,110,.12);}
+@keyframes tableGlow{0%,100%{box-shadow:0 2px 10px rgba(26,122,110,.07);}50%{box-shadow:0 0 0 3px rgba(255,215,0,.35),0 8px 24px rgba(26,122,110,.18);}}
 .filter-tag{background:rgba(26,122,110,.08);border:1px solid rgba(26,122,110,.25);color:var(--teal);border-radius:3px;padding:2px 8px;font-size:9.5px;font-weight:600;letter-spacing:.5px;display:flex;align-items:center;gap:3px;cursor:pointer;transition:all .15s;}
 .filter-tag:hover{background:rgba(26,122,110,.15);}
 
@@ -367,7 +386,6 @@ body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-
 .eff-value.mid{color:var(--yellow);}
 .eff-value.bad{color:var(--red);}
 
-
 /* ── CHARTS ────────────────────────────────── */
 .charts-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:14px;}
 .chart-card{
@@ -436,6 +454,9 @@ tr:hover td{background:rgba(26,122,110,.06);color:#0d2420;}
 ::-webkit-scrollbar-thumb:hover{background:var(--teal);}
 
 .no-data{text-align:center;padding:40px;color:var(--text4);font-size:12px;font-style:italic;}
+.chart-lbl-btn{height:22px;padding:0 8px;border-radius:4px;border:1px solid rgba(26,122,110,.2);background:rgba(26,122,110,.05);color:var(--teal);font-family:'Inter',sans-serif;font-size:9px;font-weight:600;cursor:pointer;transition:all .2s;white-space:nowrap;flex-shrink:0;}
+.chart-lbl-btn:hover{background:rgba(26,122,110,.12);}
+.chart-lbl-btn.on{background:rgba(26,122,110,.18);border-color:rgba(26,122,110,.4);}
 /* ── DRILL-THROUGH MODAL ──────────────────────── */
 .drill-toolbar{padding:10px 16px;border-bottom:1px solid rgba(26,122,110,.12);display:flex;align-items:center;gap:10px;flex-shrink:0;background:#f8faf9;}
 .drill-search{flex:1;background:#fff;border:1px solid rgba(26,122,110,.2);border-radius:6px;padding:7px 12px;font-family:'Inter',sans-serif;font-size:12px;outline:none;color:#0d2420;transition:border-color .2s;}
@@ -560,6 +581,7 @@ tr:hover td{background:rgba(26,122,110,.06);color:#0d2420;}
           <button class="gran-btn" data-gran="daily">Daily</button>
           <button class="gran-btn" data-gran="weekly">Weekly</button>
           <button class="gran-btn active" data-gran="monthly">Monthly</button>
+          <button class="gran-btn" data-gran="yearly">Yearly</button>
         </div>
       </div>
       <div class="filter-group">
@@ -590,12 +612,24 @@ tr:hover td{background:rgba(26,122,110,.06);color:#0d2420;}
         <div class="filter-label">Trip Type</div>
         <div class="ms-wrap" id="ms-trip-type"></div>
       </div>
+      <div class="filter-group">
+        <div class="filter-label">Consignee</div>
+        <div class="ms-wrap" id="ms-consignee"></div>
+      </div>
       <div class="filter-actions">
         <button class="btn-reset" onclick="resetFilters()">↺ Reset</button>
         <button class="btn-apply" onclick="applyFilters()">▶ Apply</button>
+        <button class="btn-upload" onclick="document.getElementById('yoy-section').scrollIntoView({behavior:'smooth',block:'start'})"
+          style="height:31px;padding:0 12px;border-radius:6px;font-family:'Inter',sans-serif;font-size:11px;font-weight:600;cursor:pointer;background:rgba(26,122,110,.1);color:var(--teal);border:1px solid rgba(26,122,110,.25);white-space:nowrap;transition:all .2s;"
+          title="Jump to Year-on-Year comparison chart">📊 Compare YoY</button>
       </div>
     </div>
-    <div class="filter-info" id="filter-tags"></div>
+    <!-- Active filter row: always visible; toggle shows/hides overflow -->
+    <div id="filter-tags-bar" style="padding:7px 0 0;display:flex;align-items:center;gap:6px;flex-wrap:nowrap;min-height:28px;">
+      <span id="filter-tags-status" style="font-size:10px;color:var(--text4);white-space:nowrap;flex-shrink:0;"></span>
+      <div id="filter-tags" style="display:flex;flex-wrap:wrap;gap:5px;align-items:center;flex:1;overflow:hidden;max-height:26px;transition:max-height .3s ease;"></div>
+      <button class="filter-toggle-btn" id="filter-toggle-btn" style="display:none;flex-shrink:0;" onclick="toggleActiveFilters()">▼ More</button>
+    </div>
   </div>
 
   <!-- INSIGHTS -->
@@ -654,28 +688,33 @@ tr:hover td{background:rgba(26,122,110,.06);color:#0d2420;}
   </div>
   <div class="charts-grid">
     <div class="chart-card wide">
-      <div class="chart-header"><div class="chart-title">Indent · Placement · Dispatch · Reached · Delivered</div></div>
+      <div class="chart-header"><div class="chart-title">Indent · Placement · Dispatch · Reached · Delivered</div><button class="chart-lbl-btn" id="lbl-btn-Demand" onclick="toggleChartLabels('chart-demand','Demand')" title="Toggle labels for this chart">🏷 Labels</button></div>
       <div class="chart-canvas-wrap"><canvas id="chart-demand"></canvas></div>
     </div>
     <div class="chart-card">
-      <div class="chart-header"><div class="chart-title">Backlog Trend (Open Shipments)</div></div>
+      <div class="chart-header"><div class="chart-title">Backlog Trend (Open Shipments)</div><button class="chart-lbl-btn" id="lbl-btn-Backlog" onclick="toggleChartLabels('chart-backlog','Backlog')" title="Toggle labels for this chart">🏷 Labels</button></div>
       <div class="chart-canvas-wrap"><canvas id="chart-backlog"></canvas></div>
     </div>
     <div class="chart-card">
-      <div class="chart-header"><div class="chart-title">TAT Trends (Days)</div></div>
+      <div class="chart-header"><div class="chart-title">TAT Trends (Days)</div><button class="chart-lbl-btn" id="lbl-btn-TAT" onclick="toggleChartLabels('chart-tat','TAT')" title="Toggle labels for this chart">🏷 Labels</button></div>
       <div class="chart-canvas-wrap"><canvas id="chart-tat"></canvas></div>
     </div>
     <div class="chart-card">
-      <div class="chart-header"><div class="chart-title">Detention by Period (Days)</div></div>
+      <div class="chart-header"><div class="chart-title">Detention by Period (Days)</div><button class="chart-lbl-btn" id="lbl-btn-Detention" onclick="toggleChartLabels('chart-detention','Detention')" title="Toggle labels for this chart">🏷 Labels</button></div>
       <div class="chart-canvas-wrap"><canvas id="chart-detention"></canvas></div>
     </div>
+
     <div class="chart-card">
-      <div class="chart-header"><div class="chart-title">Freight Cost Trend (₹)</div></div>
-      <div class="chart-canvas-wrap"><canvas id="chart-cost"></canvas></div>
+      <div class="chart-header"><div class="chart-title">Avg Cost per Wp (₹/Wp)</div><button class="chart-lbl-btn" id="lbl-btn-CostWp" onclick="toggleChartLabels('chart-costmw','CostWp')" title="Toggle labels for this chart">🏷 Labels</button></div>
+      <div class="chart-canvas-wrap"><canvas id="chart-costmw"></canvas></div>
     </div>
     <div class="chart-card">
-      <div class="chart-header"><div class="chart-title">Avg Cost per Wp (₹/Wp)</div></div>
-      <div class="chart-canvas-wrap"><canvas id="chart-costmw"></canvas></div>
+      <div class="chart-header"><div class="chart-title">Total THC Trend (₹)</div><button class="chart-lbl-btn" id="lbl-btn-THCTotal" onclick="toggleChartLabels('chart-thc-total','THCTotal')" title="Toggle labels for this chart">🏷 Labels</button></div>
+      <div class="chart-canvas-wrap"><canvas id="chart-thc-total"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header"><div class="chart-title">Avg THC per Shipment (₹)</div><button class="chart-lbl-btn" id="lbl-btn-THCAvg" onclick="toggleChartLabels('chart-thc-avg','THCAvg')" title="Toggle labels for this chart">🏷 Labels</button></div>
+      <div class="chart-canvas-wrap"><canvas id="chart-thc-avg"></canvas></div>
     </div>
   </div>
 
@@ -701,6 +740,20 @@ tr:hover td{background:rgba(26,122,110,.06);color:#0d2420;}
     <div class="chart-card">
       <div class="chart-header"><div class="chart-title">Customer Split</div></div>
       <div class="chart-canvas-wrap"><canvas id="chart-customer"></canvas></div>
+    </div>
+    <div class="chart-card wide">
+      <div class="chart-header">
+        <div class="chart-title">Top Consignees by Placement Pending</div>
+        <button class="chart-lbl-btn" id="lbl-btn-CnPlacement" onclick="toggleChartLabels('chart-cn-placement','CnPlacement')" title="Toggle labels">🏷 Labels</button>
+      </div>
+      <div class="chart-canvas-wrap"><canvas id="chart-cn-placement"></canvas></div>
+    </div>
+    <div class="chart-card wide">
+      <div class="chart-header">
+        <div class="chart-title">Top Consignees by Unloading Pending</div>
+        <button class="chart-lbl-btn" id="lbl-btn-CnUnloading" onclick="toggleChartLabels('chart-cn-unloading','CnUnloading')" title="Toggle labels">🏷 Labels</button>
+      </div>
+      <div class="chart-canvas-wrap"><canvas id="chart-cn-unloading"></canvas></div>
     </div>
   </div>
 
@@ -737,6 +790,46 @@ tr:hover td{background:rgba(26,122,110,.06);color:#0d2420;}
         <th>Trip Type</th><th>Location/Status</th><th>Status</th>
       </tr></thead>
       <tbody id="data-tbody"></tbody></table>
+    </div>
+  </div>
+
+
+  <!-- YEAR-ON-YEAR COMPARISON SECTION -->
+  <div id="yoy-section">
+    <div class="section-header" style="margin-top:22px;">
+      <div class="section-title">📊 Year-on-Year Comparison</div>
+      <div class="section-line"></div>
+      <span style="font-size:10px;color:var(--text4);margin-left:8px;">Compares selected date range vs same period last year</span>
+    </div>
+    <div class="chart-card" style="padding:18px 20px;">
+      <div style="display:flex;align-items:center;gap:16px;margin-bottom:14px;flex-wrap:wrap;">
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          <span style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--text4);">Parameter</span>
+          <select id="yoy-metric" class="filter-control" style="min-width:180px;height:32px;" onchange="renderYoY()">
+            <option value="indents">Demand (Indents)</option>
+            <option value="dispatched">Execution (Dispatched)</option>
+            <option value="thc">Total THC (₹)</option>
+            <option value="avgthc">Avg THC / Shipment</option>
+            <option value="costwp">Avg Cost / Wp (₹)</option>
+          </select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          <span style="font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--text4);">Granularity</span>
+          <div class="gran-btns" style="height:32px;">
+            <button class="gran-btn active" data-yoy-gran="monthly" onclick="setYoYGran(this,'monthly')">Monthly</button>
+            <button class="gran-btn" data-yoy-gran="weekly" onclick="setYoYGran(this,'weekly')">Weekly</button>
+            <button class="gran-btn" data-yoy-gran="daily" onclick="setYoYGran(this,'daily')">Daily</button>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;margin-left:auto;">
+          <button id="yoy-label-btn" onclick="toggleYoYLabels()" 
+            style="height:30px;padding:0 12px;border-radius:5px;border:1px solid rgba(26,122,110,.25);background:rgba(26,122,110,.07);color:var(--teal);font-family:'Inter',sans-serif;font-size:10px;font-weight:600;cursor:pointer;transition:all .2s;">
+            🏷 Hide Labels
+          </button>
+          <div id="yoy-pct-badge" style="font-family:'Poppins',sans-serif;font-size:18px;font-weight:700;padding:5px 14px;border-radius:8px;background:rgba(26,122,110,.08);border:1px solid rgba(26,122,110,.15);"></div>
+        </div>
+      </div>
+      <div class="chart-canvas-wrap" style="height:260px;"><canvas id="chart-yoy"></canvas></div>
     </div>
   </div>
 
@@ -782,10 +875,40 @@ tr:hover td{background:rgba(26,122,110,.06);color:#0d2420;}
 // ════════════════════════════════════════════════════════════
 // CHART.JS DEFAULTS
 // ════════════════════════════════════════════════════════════
+// Register chartjs-plugin-datalabels if loaded
+if (typeof ChartDataLabels !== 'undefined') {
+  Chart.register(ChartDataLabels);
+}
+
 Chart.defaults.color = '#3a7068';
 Chart.defaults.borderColor = 'rgba(26,122,110,.15)';
 Chart.defaults.font.family = "'Inter',sans-serif";
 Chart.defaults.font.size = 11;
+
+// ════════════════════════════════════════════════════════════
+// PER-CHART DATA LABELS TOGGLE
+// ════════════════════════════════════════════════════════════
+let _showDataLabels = false;  // kept for compat — per-chart state below
+const _chartLabelState = {};  // { chartId: boolean }
+
+function toggleChartLabels(chartId, key) {
+  _chartLabelState[chartId] = !(_chartLabelState[chartId] || false);
+  const on = _chartLabelState[chartId];
+  const btn = document.getElementById('lbl-btn-' + key);
+  if (btn) { btn.textContent = on ? '🏷 On' : '🏷 Labels'; btn.classList.toggle('on', on); }
+  const chart = allCharts[chartId];
+  if (!chart) return;
+  chart.data.datasets.forEach(ds => {
+    if (!ds.datalabels) ds.datalabels = {};
+    ds.datalabels.display = on;
+  });
+  if (chart.options.plugins && chart.options.plugins.datalabels) {
+    chart.options.plugins.datalabels.display = on;
+  }
+  chart.update('none');
+}
+
+function toggleDataLabels() {} // no-op — global toggle removed; use per-chart buttons
 
 const PAL = ['#26a69a','#9bc53d','#54a0ff','#ff9f43','#ff6b6b','#a29bfe','#ffd32a','#fd79a8','#55efc4','#e17055'];
 
@@ -815,6 +938,17 @@ const KPI_TIPS = {
   'Avg THC / Shipment':'Average THC (Rs.) per shipment = Total THC ÷ Number of Shipments in filtered view.',
   'Total THC':'Sum of all THC (Rs.) values in the filtered dataset.',
   'Total THC':           'SUM of "THC (Rs.)" column across all filtered rows.',
+  'Placed':              'COUNT of rows where Act. Placement Date is a VALID date (not null, not "-", not blank).',
+  'Dispatched':          'COUNT of rows where Dispatch Date is a VALID date (not null, not "-", not blank).',
+  'Delivered':           'COUNT of rows where both Actual Reporting At Destination AND Unloading/Release at Destination are valid dates.',
+  'Total Indents':       'COUNT of rows in the filtered view where Indent Date is a VALID date (not null, not "-", not blank).',
+  'Avg Cost/Wp':         'Average of (THC ÷ Total Wp) across all filtered rows where Total Wp > 0. Unit: ₹ per Watt-peak.',
+  'YTD Not Placed':      'YTD count: Indent Date exists but Act. Placement Date is missing. Ignores date filter; respects all other filters.',
+  'YTD Awaiting Dispatch':'YTD count: Indent + Placement dates exist but Dispatch Date is missing. Ignores date filter; respects all other filters.',
+  'YTD Total Open':      'YTD sum of Not Placed + Awaiting Dispatch. Ignores date filter; respects all other filters.',
+  'YTD In Transit':      'YTD count: Dispatched but Actual Reporting At Destination does not exist. Ignores date filter.',
+  'YTD At Destination':  'YTD count: Reporting exists but Unloading/Release does not. Ignores date filter.',
+  'YTD Completed':       'YTD count: Both Reporting and Unloading/Release exist. Ignores date filter; respects all other filters.',
 };
 
 function showKPITip(e, title) {
@@ -845,12 +979,17 @@ let crossFilter = { transporter: null, route: null, vehicle: null, customer: nul
 let excSortKey = '_placementDelay', excSortDir = -1;
 const msState = {
   customer: new Set(), from: new Set(), to: new Set(),
-  transporter: new Set(), vehType: new Set(), status: new Set(), tripType: new Set()
+  transporter: new Set(), vehType: new Set(), status: new Set(), tripType: new Set(), consignee: new Set()
 };
 
-// ════════════════════════════════════════════════════════════
-// CLOCK — starts immediately, updates every second
-// ════════════════════════════════════════════════════════════
+
+function deltaHtml(curr, ly) {
+  if (!ly || ly === 0) return '';
+  const pct = ((curr - ly) / ly * 100);
+  const sign = pct > 0 ? '+' : '';
+  const cls = pct > 5 ? 'up' : pct < -5 ? 'dn' : 'neu';
+  return `<span class="kpi-cmp-delta ${cls}">${sign}${pct.toFixed(0)}%</span>`;
+}
 function updateClock() {
   const el = document.getElementById('clock');
   if (el) el.textContent = new Date().toLocaleTimeString('en-IN');
@@ -965,9 +1104,19 @@ function processFile(file) {
 
       // Filter and parse rows
       rawData = json.filter(r => {
-        const hasData = Object.values(r).some(v => v !== null && v !== '' && v !== undefined);
-        const hasId   = r['Indent Date'] || r['LR No./ Shipment No.'] || r['Sl No'];
-        return hasData && hasId;
+        // Row must have actual data (not all null/empty)
+        const hasData = Object.values(r).some(v => v !== null && v !== '' && v !== undefined && String(v).trim() !== '' && String(v).trim() !== '-');
+        // Row must have a meaningful identifier
+        const hasId = r['Indent Date'] || r['LR No./ Shipment No.'] || r['Sl No'];
+        // Reject template/header rows that might have "-" in date columns
+        if (!hasData || !hasId) return false;
+        // Further reject rows where ALL date columns contain "-" or invalid values
+        const dateFields = ['Indent Date','Act. Placement Date','Dispatch Date','Actual Reporting At Destination','Unloading/Release at Destination'];
+        const hasAnyValidDate = dateFields.some(f => {
+          const v = String(r[f] || '').trim();
+          return v && v !== '-' && v !== 'NA' && v !== 'N/A' && /\d/.test(v);
+        });
+        return hasAnyValidDate;
       }).map(r => parseRow(r));
 
       if (rawData.length === 0) {
@@ -1007,18 +1156,46 @@ function processFile(file) {
 // ════════════════════════════════════════════════════════════
 // DATE PARSING
 // ════════════════════════════════════════════════════════════
+// STRICT date parser — rejects "-", "N/A", "NA", blanks, and any non-parseable value
+const _INVALID_DATE_STRINGS = new Set(['-','--','na','n/a','nil','none','null','undefined','invalid','']);
+
+// Normalize a Date to local midnight (removes time/timezone shift)
+function normDate(d) {
+  if (!d || isNaN(d.getTime())) return null;
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()); // local midnight, no UTC shift
+}
+
+// Return YYYY-MM-DD string from a normalized date
+function dateKey(d) {
+  if (!d) return null;
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
 function parseDate(val) {
-  if (!val) return null;
-  if (val instanceof Date) return isNaN(val.getTime()) ? null : val;
+  if (val === null || val === undefined) return null;
+  if (val instanceof Date) return normDate(isNaN(val.getTime()) ? null : val);
   const s = String(val).trim();
-  if (!s || s === 'null') return null;
-  let d = new Date(s);
-  if (!isNaN(d.getTime())) return d;
+  if (_INVALID_DATE_STRINGS.has(s.toLowerCase())) return null;
+  if (!/\d/.test(s)) return null;
+
+  // ISO YYYY-MM-DD → parse directly without timezone shift
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    const [y,mo,da] = s.split('-').map(Number);
+    if (y > 1900 && y < 2100) return new Date(y, mo-1, da);
+  }
+
+  // DD/MM/YYYY or DD-MM-YYYY
   const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
   if (m) {
-    d = new Date(`${m[3].length===2?'20'+m[3]:m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`);
-    if (!isNaN(d.getTime())) return d;
+    const yr = m[3].length === 2 ? 2000 + Number(m[3]) : Number(m[3]);
+    const d = new Date(yr, Number(m[2])-1, Number(m[1]));
+    if (!isNaN(d.getTime()) && d.getFullYear() > 1900 && d.getFullYear() < 2100) return d;
   }
+
+  // Fallback: browser parse then normalize
+  const d = new Date(s);
+  if (!isNaN(d.getTime()) && d.getFullYear() > 1900 && d.getFullYear() < 2100) return normDate(d);
+
   return null;
 }
 function daysDiff(d1, d2) {
@@ -1127,7 +1304,7 @@ function parseRow(r) {
     _transporter: String(r['Transporter Name'] || '').trim(),
     _vehType: String(r['Veh. Type'] || '').trim(),
     _lr: String(r['LR No./ Shipment No.'] || '').trim(),
-    _consignee: String(r['Consignee Name'] || '').trim(),
+    _consignee: String(r['Consignee Name'] || '').trim() || null,  // null if blank
     _tripType: tripType,
     _currentLocation: currentLocation,
   };
@@ -1278,6 +1455,7 @@ function buildMultiSelects() {
   _msOptions.vehType   = [...new Set(rawData.map(r => r._vehType).filter(Boolean))].sort();
   _msOptions.status    = ['NOT_PLACED','PLACED_NOT_DISPATCHED','IN_TRANSIT','AT_DESTINATION','COMPLETED'];
   _msOptions.tripType  = ['STO','Actual Trip','Direct Trip','Others'];
+  _msOptions.consignee = [...new Set(rawData.map(r => r._consignee).filter(Boolean))].sort();
 
   buildMultiSelect('ms-customer',   'customer',   _msOptions.customer,   'All Customers');
   buildMultiSelect('ms-from',       'from',        _msOptions.from,       'All Origins');
@@ -1286,6 +1464,7 @@ function buildMultiSelects() {
   buildMultiSelect('ms-veh-type',   'vehType',     _msOptions.vehType,    'All Types');
   buildMultiSelect('ms-status',     'status',      _msOptions.status,     'All Statuses');
   buildMultiSelect('ms-trip-type',  'tripType',    _msOptions.tripType,   'All Trip Types');
+  buildMultiSelect('ms-consignee',  'consignee',   _msOptions.consignee,  'All Consignees');
 
   document.querySelectorAll('.dt-btn').forEach(b => b.addEventListener('click', () => {
     document.querySelectorAll('.dt-btn').forEach(x => x.classList.remove('active'));
@@ -1296,7 +1475,6 @@ function buildMultiSelects() {
     b.classList.add('active'); granularity = b.dataset.gran;
     renderTrends(); updateChartMeta();
   }));
-
   const dates = rawData.map(r => r._indentDate).filter(Boolean);
   if (dates.length) {
     document.getElementById('f-date-from').value = new Date(Math.min(...dates.map(d => d.getTime()))).toISOString().split('T')[0];
@@ -1321,10 +1499,18 @@ function applyFilters() {
   const vehExcluded  = new Set([...msState.vehType].map(v  => String(v).trim()));
   const tripExcluded = new Set([...msState.tripType].map(v => String(v).trim()));
 
+  // Normalize boundary dates to local midnight for inclusive comparison
+  const fromNorm  = from  ? new Date(from.getFullYear(),  from.getMonth(),  from.getDate())  : null;
+  const toNorm    = toVal ? new Date(toVal.getFullYear(), toVal.getMonth(), toVal.getDate()) : null;
+
   filteredData = rawData.filter(r => {
     const df = getDateField(r);
-    if (from  && (!df || df < from))  return false;
-    if (toVal && (!df || df > toVal)) return false;
+    // When a date range is active, require the date field to be valid AND in range (fully inclusive).
+    if (fromNorm || toNorm) {
+      if (!df) return false;                          // null date → exclude from date-ranged view
+      if (fromNorm && df < fromNorm) return false;    // before start date
+      if (toNorm   && df > toNorm)  return false;     // after end date (inclusive: same day passes)
+    }
     // EXCLUSION logic: if excluded set non-empty, hide rows whose value IS in the excluded set
     if (msState.customer.size    > 0 && msState.customer.has(r._customer))       return false;
     if (msState.from.size        > 0 && msState.from.has(r._from))               return false;
@@ -1333,6 +1519,7 @@ function applyFilters() {
     if (vehExcluded.size  > 0 && vehExcluded.has(String(r._vehType || '').trim()))   return false;
     if (msState.status.size      > 0 && msState.status.has(r._status))           return false;
     if (tripExcluded.size > 0 && tripExcluded.has(String(r._tripType || '').trim())) return false;
+    if (msState.consignee.size > 0 && msState.consignee.has(String(r._consignee || '').trim())) return false;
     // Cross-filters
     if (crossFilter.transporter && r._transporter !== crossFilter.transporter) return false;
     if (crossFilter.vehicle     && r._vehType     !== crossFilter.vehicle)     return false;
@@ -1349,6 +1536,7 @@ function applyFilters() {
 function resetFilters() {
   Object.keys(msState).forEach(k => msState[k].clear());
   Object.keys(crossFilter).forEach(k => crossFilter[k] = null);
+  msState.consignee.clear();
   document.querySelectorAll('.dt-btn').forEach(b => { b.classList.remove('active'); if (b.dataset.type === 'indent') b.classList.add('active'); });
   dateType = 'indent';
   buildMultiSelects();
@@ -1358,81 +1546,338 @@ function resetFilters() {
   updateChartMeta();
 }
 
-function renderFilterTags() {
-  const el = document.getElementById('filter-tags');
-  const parts = [];
+let _filterTagsExpanded = false;
 
-  // Helper: build one tag per selected value in a msState key
-  const addTags = (stateKey, labelPrefix) => {
-    // msState stores EXCLUDED values — show them as 'hidden' tags
-    msState[stateKey].forEach(val => {
-      parts.push({ label: `Hide ${labelPrefix}: ${val}`, stateKey, val });
-    });
-  };
 
-  addTags('customer',   'Customer');
-  addTags('from',       'From');
-  addTags('to',         'To');
-  addTags('transporter','Transporter');
-  addTags('vehType',    'VehType');
-  addTags('status',     'Status');
-  addTags('tripType',   'TripType');
 
-  // Cross-filters
-  Object.entries(crossFilter).forEach(([k,v]) => {
-    if (v) parts.push({ label: `CF-${k}: ${v.slice(0,20)}`, cfKey: k });
+// ════════════════════════════════════════════════════════════
+// COLLAPSIBLE FILTER TAGS
+// ════════════════════════════════════════════════════════════
+
+
+// ════════════════════════════════════════════════════════════
+// YEAR-ON-YEAR COMPARISON CHART
+// ════════════════════════════════════════════════════════════
+let yoyGranularity = 'monthly';
+
+function setYoYGran(btn, gran) {
+  document.querySelectorAll('[data-yoy-gran]').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  yoyGranularity = gran;
+  renderYoY();
+}
+
+function yoyGroupKey(r, gran) {
+  const d = r._indentDate;
+  if (!d) return null;
+  if (gran === 'daily')   return d.toISOString().split('T')[0];
+  if (gran === 'weekly') {
+    const t = new Date(d.getTime());
+    const dow = (t.getDay()+6)%7;
+    t.setDate(t.getDate()-dow);
+    const wk = Math.ceil((t - new Date(t.getFullYear(),0,1))/604800000+1);
+    return `W${String(wk).padStart(2,'0')}`;   // week number only (no year, so CY and LY align)
+  }
+  return `${String(d.getMonth()+1).padStart(2,'0')}`; // month number only (01-12)
+}
+
+function yoyPrettyKey(k, gran) {
+  if (gran === 'daily') {
+    const d = new Date(k + 'T00:00:00');
+    return d.toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
+  }
+  if (gran === 'weekly') return k;
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return months[parseInt(k,10)-1] || k;
+}
+
+function getMetricValue(rows, metric) {
+  if (!rows || !rows.length) return 0;
+  switch(metric) {
+    case 'indents':    return rows.length;
+    case 'dispatched': return rows.filter(r=>r._dispatch).length;
+    case 'thc':        return safeSum(rows.map(r=>r._thc));
+    case 'avgthc':     return rows.length ? safeSum(rows.map(r=>r._thc))/rows.length : 0;
+    case 'costwp': {
+      const wpR = rows.filter(r=>r._costPerWp>0);
+      return wpR.length ? safeAvg(wpR.map(r=>r._costPerWp)) : 0;
+    }
+    default: return 0;
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// YoY LABEL TOGGLE
+// ════════════════════════════════════════════════════════════
+let _showYoYLabels = true;
+function toggleYoYLabels() {
+  _showYoYLabels = !_showYoYLabels;
+  const btn = document.getElementById('yoy-label-btn');
+  if (btn) btn.textContent = _showYoYLabels ? '🏷 Hide Labels' : '🏷 Show Labels';
+  const ch = allCharts['chart-yoy'];
+  if (!ch) return;
+  ch.data.datasets.forEach(ds => {
+    if (!ds.datalabels) ds.datalabels = {};
+    ds.datalabels.display = _showYoYLabels;
   });
+  if (ch.options.plugins && ch.options.plugins.datalabels) {
+    ch.options.plugins.datalabels.display = _showYoYLabels;
+  }
+  ch.update('none');
+}
 
-  if (!parts.length) {
-    el.innerHTML = `<span style="color:var(--text4)">No active filters — showing all ${filteredData.length} records</span>`;
+function renderYoY() {
+  destroyChart('chart-yoy');
+  const ctx = document.getElementById('chart-yoy'); if (!ctx) return;
+
+  const metric   = document.getElementById('yoy-metric')?.value || 'indents';
+  const fromStr  = document.getElementById('f-date-from').value;
+  const toStr    = document.getElementById('f-date-to').value;
+  const badge    = document.getElementById('yoy-pct-badge');
+
+  if (!fromStr || !toStr) {
+    if (badge) badge.textContent = 'Set a date range to compare';
     return;
   }
 
-  el.innerHTML = 'Active: ' + parts.map((p, i) =>
-    `<span class="filter-tag" data-tag-idx="${i}" onclick="removeFilterTag(${i})" title="Click to remove">${p.label} ✕</span>`
-  ).join('');
+  // Parse selected date range
+  const selFrom = new Date(fromStr + 'T00:00:00');
+  const selTo   = new Date(toStr   + 'T23:59:59');
+  const selFromNorm = new Date(selFrom.getFullYear(), selFrom.getMonth(), selFrom.getDate());
+  const selToNorm   = new Date(selTo.getFullYear(),   selTo.getMonth(),   selTo.getDate());
 
-  // Store parts on the element for removal logic
-  el._tagParts = parts;
-}
-
-function removeFilterTag(idx) {
-  const el = document.getElementById('filter-tags');
-  const parts = el._tagParts;
-  if (!parts || !parts[idx]) return;
-  const p = parts[idx];
-
-  if (p.cfKey) {
-    crossFilter[p.cfKey] = null;
-  } else if (p.stateKey && p.val !== undefined) {
-    msState[p.stateKey].delete(p.val); // remove from exclusion set (re-include this value)
-    // Resolve the correct ms-id (same logic as buildMultiSelect: id = 'ms-' + stateKey)
-    const msId = 'ms-' + p.stateKey;
-    const optsEl = document.getElementById(msId + '-opts');
-    if (optsEl) {
-      optsEl.querySelectorAll('.ms-option').forEach(op => {
-        const span = op.querySelector('span');
-        const cb   = op.querySelector('input');
-        if (span && cb && span.textContent === p.val) cb.checked = false;
-      });
+  // Helper: get metric value from a set of rows
+  function getMetricVal(rows) {
+    if (!rows.length) return 0;
+    switch(metric) {
+      case 'indents':    return rows.filter(r=>r._indentDate).length;
+      case 'placed':     return rows.filter(r=>r._actPlacement).length;
+      case 'dispatched': return rows.filter(r=>r._dispatch).length;
+      case 'thc':        return Math.round(rows.reduce((s,r)=>s+r._thc,0));
+      case 'avgthc':     { const v = rows.reduce((s,r)=>s+r._thc,0); return rows.length ? +(v/rows.length).toFixed(2) : 0; }
+      case 'costwp':     { const wp=rows.filter(r=>r._costPerWp>0); return wp.length ? +(wp.reduce((s,r)=>s+r._costPerWp,0)/wp.length).toFixed(4) : 0; }
+      default:           return rows.filter(r=>r._indentDate).length;
     }
-    updateMSLabel(msId, p.stateKey);
   }
 
-  applyFilters();
-}
+  // Apply all non-date filters to raw data
+  const vehExcl  = new Set([...msState.vehType].map(v=>String(v).trim()));
+  const tripExcl = new Set([...msState.tripType].map(v=>String(v).trim()));
+  function passesOtherFilters(r) {
+    if (msState.customer.size>0   && msState.customer.has(r._customer))    return false;
+    if (msState.from.size>0       && msState.from.has(r._from))             return false;
+    if (msState.to.size>0         && msState.to.has(r._to))                 return false;
+    if (msState.transporter.size>0 && msState.transporter.has(r._transporter)) return false;
+    if (vehExcl.size>0            && vehExcl.has(String(r._vehType||'').trim())) return false;
+    if (msState.status.size>0     && msState.status.has(r._status))        return false;
+    if (tripExcl.size>0           && tripExcl.has(String(r._tripType||'').trim())) return false;
+    if (msState.consignee.size>0  && msState.consignee.has(String(r._consignee||'').trim())) return false;
+    return true;
+  }
 
-function updateChartMeta() {
-  const from = document.getElementById('f-date-from').value;
-  const to   = document.getElementById('f-date-to').value;
-  const cust = msState.customer.size ? [...msState.customer].join(', ') : 'All Customers';
-  const el   = document.getElementById('chart-title-meta');
-  if (el) el.textContent = `${from||'—'} → ${to||'—'} · ${cust} · ${granularity}`;
+  // Discover all years available in raw dataset (from indent dates)
+  const allYears = [...new Set(rawData
+    .filter(r => r._indentDate)
+    .map(r => r._indentDate.getFullYear())
+  )].sort((a,b)=>a-b);
+
+  if (!allYears.length) { if (badge) badge.textContent = 'No year data'; return; }
+
+  const currentYear = selFrom.getFullYear();
+  // Period length in ms
+  const periodMs = selToNorm.getTime() - selFromNorm.getTime();
+
+  // For each year build the equivalent date range (same month-day offsets)
+  const yearConfigs = allYears.map(yr => {
+    const yFrom = new Date(yr, selFromNorm.getMonth(), selFromNorm.getDate());
+    const yTo   = new Date(yr, selToNorm.getMonth(),   selToNorm.getDate());
+    return { yr, yFrom, yTo };
+  });
+
+  // Grouping by yoyGranularity
+  function getYoYKey(d, yr) {
+    switch(yoyGranularity) {
+      case 'daily':
+        return `${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}`;
+      case 'weekly': {
+        const dow = (d.getDay()+6)%7;
+        const weekStart = new Date(d); weekStart.setDate(d.getDate()-dow);
+        const wn = Math.ceil((weekStart - new Date(weekStart.getFullYear(),0,1))/604800000+1);
+        return `W${String(wn).padStart(2,'0')}`;
+      }
+      case 'yearly': return String(yr);
+      default: return `${String(d.getMonth()+1).padStart(2,'0')}`;  // monthly: MM
+    }
+  }
+  function prettyYoYKey(k, yr) {
+    switch(yoyGranularity) {
+      case 'daily':   { const [da,mo]=k.split('-'); return `${da} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][Number(mo)-1]}`; }
+      case 'weekly':  return k;
+      case 'yearly':  return String(yr);
+      default: { const moNames=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; return moNames[Number(k)-1]; }
+    }
+  }
+
+  // Get all period buckets from selected year
+  const bucketSet = new Set();
+  rawData
+    .filter(r => r._indentDate && r._indentDate >= yearConfigs.find(y=>y.yr===currentYear)?.yFrom && r._indentDate <= yearConfigs.find(y=>y.yr===currentYear)?.yTo)
+    .forEach(r => { if (r._indentDate) bucketSet.add(getYoYKey(r._indentDate, currentYear)); });
+
+  // Also add buckets from all years' ranges
+  yearConfigs.forEach(({yr, yFrom, yTo}) => {
+    rawData
+      .filter(r => r._indentDate && r._indentDate >= yFrom && r._indentDate <= yTo)
+      .forEach(r => { if (r._indentDate) bucketSet.add(getYoYKey(r._indentDate, yr)); });
+  });
+
+  const buckets = [...bucketSet].sort();
+
+  if (!buckets.length) {
+    if (badge) badge.textContent = 'No overlapping data';
+    return;
+  }
+
+  // For each year × bucket, compute metric
+  const colors = ['#54a0ff','#26a69a','#9bc53d','#ff9f43','#ff6b6b','#a29bfe','#ffd32a'];
+  const datasets = yearConfigs.map((cfg, ci) => {
+    const data = buckets.map(bk => {
+      const rows = rawData.filter(r => {
+        if (!r._indentDate) return false;
+        if (r._indentDate < cfg.yFrom || r._indentDate > cfg.yTo) return false;
+        if (getYoYKey(r._indentDate, cfg.yr) !== bk) return false;
+        return passesOtherFilters(r);
+      });
+      return getMetricVal(rows);
+    });
+    return {
+      label: String(cfg.yr),
+      data,
+      backgroundColor: colors[ci % colors.length] + 'cc',
+      borderColor:     colors[ci % colors.length],
+      borderWidth: 1, borderRadius: 4,
+      datalabels: {
+        display: _showYoYLabels,
+        font: {size:8,weight:'600',family:"'Inter',sans-serif"},
+        color: '#0d2420', anchor:'end', align:'end', offset:2,
+        backgroundColor:'rgba(255,255,255,.78)', borderRadius:3,
+        padding:{top:2,bottom:2,left:4,right:4},
+        formatter: v => {
+          if (!v) return '';
+          if (v >= 1e5) return '₹'+(v/1e5).toFixed(2)+'L';
+          if (v < 1 && v !== 0) return v.toFixed(2);
+          return Math.round(v).toLocaleString('en-IN');
+        }
+      }
+    };
+  });
+
+  // X-axis labels: bucket + year (if yearly) or just bucket
+  const xLabels = buckets.map(bk => {
+    if (yoyGranularity === 'yearly') return bk;
+    return prettyYoYKey(bk, currentYear);
+  });
+
+  // % change: compare latest 2 years if available
+  let pctText = '';
+  if (yearConfigs.length >= 2) {
+    const cur = yearConfigs[yearConfigs.length-1];
+    const prev= yearConfigs[yearConfigs.length-2];
+    const curVal  = getMetricVal(rawData.filter(r=>r._indentDate && r._indentDate>=cur.yFrom  && r._indentDate<=cur.yTo  && passesOtherFilters(r)));
+    const prevVal = getMetricVal(rawData.filter(r=>r._indentDate && r._indentDate>=prev.yFrom && r._indentDate<=prev.yTo && passesOtherFilters(r)));
+    if (prevVal > 0) {
+      const pct = ((curVal - prevVal) / prevVal * 100).toFixed(1);
+      const sign = pct >= 0 ? '▲' : '▼';
+      pctText = `${sign} ${Math.abs(pct)}% vs ${prev.yr}`;
+    } else {
+      pctText = `${cur.yr}: ${curVal.toLocaleString('en-IN')}`;
+    }
+  }
+  if (badge) {
+    badge.textContent = pctText;
+    badge.style.color = pctText.startsWith('▲') ? 'var(--red)' : pctText.startsWith('▼') ? 'var(--lime)' : 'var(--text)';
+  }
+
+  const fmtVal = v => {
+    if (v===null||v===undefined) return '';
+    if (v>=1e7) return '₹'+(v/1e7).toFixed(2)+'Cr';
+    if (v>=1e5) return '₹'+(v/1e5).toFixed(2)+'L';
+    if (v<1&&v!==0) return v.toFixed(2);
+    if (v<1000) return Number(v.toFixed(2)).toLocaleString('en-IN');
+    return Math.round(v).toLocaleString('en-IN');
+  };
+
+  allCharts['chart-yoy'] = new Chart(ctx, {
+    type: 'bar',
+    data: { labels: xLabels, datasets },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins: {
+        legend: { position:'top', labels:{boxWidth:10,padding:14,font:{size:10}} },
+        datalabels: { display: _showYoYLabels },
+        tooltip: {
+          callbacks: {
+            label: ctx2 => ` ${ctx2.dataset.label}: ${fmtVal(ctx2.parsed.y)}`,
+          }
+        }
+      },
+      scales: {
+        x: { grid:{display:false}, ticks:{font:{size:9},maxRotation:45} },
+        y: { grid:{color:'rgba(26,122,110,.1)'}, beginAtZero:true,
+             ticks:{callback:v=>fmtVal(v)} }
+      },
+      animation: {duration:500},
+      onClick: (e, els) => {
+        if (!els.length) return;
+        const dsIdx  = els[0].datasetIndex;
+        const bkIdx  = els[0].index;
+        const cfg    = yearConfigs[dsIdx];
+        if (!cfg) return;
+        const bk     = buckets[bkIdx];
+        // Filter rows: must be in this year's range, match this bucket, and pass other filters
+        const drillRows = rawData.filter(r => {
+          if (!r._indentDate) return false;
+          if (r._indentDate < cfg.yFrom || r._indentDate > cfg.yTo) return false;
+          if (getYoYKey(r._indentDate, cfg.yr) !== bk) return false;
+          return passesOtherFilters(r);
+        });
+        const label = `YoY ${cfg.yr} — ${prettyYoYKey(bk, cfg.yr)}`;
+        drillWithHighlight(label, drillRows);
+      }
+    }
+  });
 }
 
 // ════════════════════════════════════════════════════════════
-// RENDER ALL
+// COLLAPSIBLE ACTIVE FILTERS
 // ════════════════════════════════════════════════════════════
+let _filtersVisible = false;
+function toggleActiveFilters() {
+  _filtersVisible = !_filtersVisible;
+  const inner = document.getElementById('filter-tags');
+  const btn   = document.getElementById('filter-toggle-btn');
+  if (!inner) return;
+  if (_filtersVisible) {
+    inner.style.maxHeight = inner.scrollHeight + 'px';
+    if (btn) btn.textContent = '▲ Less';
+  } else {
+    inner.style.maxHeight = '26px';
+    if (btn) btn.textContent = '▼ More';
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// VARIANCE HELPER
+// ════════════════════════════════════════════════════════════
+function computeVariance(data) {
+  // Returns array of variance % vs previous period. First element = null.
+  return data.map((v, i) => {
+    if (i === 0) return null;
+    const prev = data[i - 1];
+    if (prev === null || prev === undefined || prev === 0) return null;
+    return ((v - prev) / Math.abs(prev)) * 100;
+  });
+}
 function renderAll() {
   renderKPIs();
   renderYTDKPIs();
@@ -1441,6 +1886,7 @@ function renderAll() {
   renderBottlenecks();
   renderTrends();
   renderDeepDive();
+  renderYoY();
   renderExceptionTable();
   renderDataTable();
 }
@@ -1464,6 +1910,7 @@ function renderYTDKPIs() {
     if (vehSet.size  > 0 && vehSet.has(String(r._vehType || '').trim()))         return false;
     if (msState.status.size      > 0 && msState.status.has(r._status))           return false;
     if (tripSet.size > 0 && tripSet.has(String(r._tripType || '').trim()))       return false;
+    if (msState.consignee.size > 0 && msState.consignee.has(String(r._consignee || '').trim())) return false;
     if (crossFilter.transporter && r._transporter !== crossFilter.transporter) return false;
     if (crossFilter.vehicle     && r._vehType     !== crossFilter.vehicle)     return false;
     if (crossFilter.customer    && r._customer    !== crossFilter.customer)    return false;
@@ -1471,7 +1918,8 @@ function renderYTDKPIs() {
     return true;
   });
 
-  const total       = d.length;
+  // YTD TOTAL = rows where Indent Date exists (original definition)
+  const total       = d.filter(r => r._indentDate).length;
   const notPlaced   = d.filter(r => r._indentDate && !r._actPlacement).length;
   const placedNoDisp= d.filter(r => r._indentDate && r._actPlacement && !r._dispatch).length;
   const inTransit   = d.filter(r => r._dispatch && !r._reporting).length;
@@ -1508,13 +1956,14 @@ function fmtMoney(n) {
   return '₹' + Math.round(n).toLocaleString('en-IN');
 }
 
-function kpiCard(icon, label, value, unit, sub, type='', drillFn='') {
+function kpiCard(icon, label, value, unit, sub, type='', drillFn='', cmpHtml='') {
   const drillAttr = drillFn ? ` data-drill="${drillFn.replace(/"/g,'&quot;')}" style="cursor:pointer;"` : '';
   const drillHint = drillFn ? `<span style="font-size:8px;opacity:.55;margin-left:3px;">🔍</span>` : '';
   return `<div class="kpi-card ${type}" onmouseenter="showKPITip(event,'${label.replace(/'/g,"\\'")}')" onmouseleave="hideKPITip()"${drillAttr}>
     <div class="kpi-icon">${icon}</div>
     <div class="kpi-label">${label}${drillHint} <span class="kpi-info-btn" title="Click for definition">ℹ</span></div>
     <div class="kpi-value">${value}<span class="kpi-unit">${unit}</span></div>
+    ${cmpHtml ? `<div class="kpi-cmp">${cmpHtml}</div>` : ''}
     ${sub?`<div class="kpi-sub">${sub}</div>`:''}
   </div>`;
 }
@@ -1535,22 +1984,34 @@ const TRUCK_SVG = `<svg style="width:16px;height:12px;vertical-align:middle;opac
 // KPIs
 // ════════════════════════════════════════════════════════════
 function renderKPIs() {
-  const d = filteredData, total = d.length;
+  const d = filteredData;
 
-  // STRICT STATUS COUNTS
-  const notPlaced   = d.filter(r => r._indentDate && !r._actPlacement).length;
-  const placedNoDisp= d.filter(r => r._indentDate && r._actPlacement && !r._dispatch).length;
-  const inTransit   = d.filter(r => r._dispatch && !r._reporting).length;          // Dispatch exists, Reporting does NOT
-  const atDest      = d.filter(r => r._reporting && !r._unloading).length;          // Reporting exists, Unloading does NOT
-  const completed   = d.filter(r => r._reporting && r._unloading).length;           // Both exist
-  const totalOpen   = notPlaced + placedNoDisp;
-  const pctOpen     = total ? ((totalOpen/total)*100).toFixed(1) : 0;
-  const pctComp     = total ? ((completed/total)*100).toFixed(1) : 0;
+  // TOTAL INDENTS: rows where Indent Date exists (original definition)
+  const total = d.filter(r => r._indentDate).length;
+
+  // STRICT STATUS COUNTS — all conditioned on indentDate existing
+  const notPlaced    = d.filter(r => r._indentDate && !r._actPlacement).length;
+  const placedNoDisp = d.filter(r => r._indentDate && r._actPlacement && !r._dispatch).length;
+  const inTransit    = d.filter(r => r._dispatch && !r._reporting).length;
+  const atDest       = d.filter(r => r._reporting && !r._unloading).length;
+  const completed    = d.filter(r => r._reporting && r._unloading).length;
+  const placed       = d.filter(r => r._actPlacement).length;
+  const dispatched   = d.filter(r => r._dispatch).length;
+
+  const totalOpen  = notPlaced + placedNoDisp;
+  const pctOpen    = total ? ((totalOpen / total) * 100).toFixed(1) : 0;
+  const pctComp    = total ? ((completed  / total) * 100).toFixed(1) : 0;
+  const pctPlaced  = total ? ((placed     / total) * 100).toFixed(1) : 0;
+  const pctDisp    = total ? ((dispatched / total) * 100).toFixed(1) : 0;
 
   document.getElementById('kpi-core').innerHTML =
     kpiCard('📦','Total Indents',fmtN(total),'',`All filtered records`,'',
       'drillOpen("All Indents",filteredData)') +
-    kpiCard('✅','Completed',fmtN(completed),'',`${pctComp}% — Reporting + Unloading done`,'accent',
+    kpiCard('🏭','Placed',fmtN(placed),'',`${pctPlaced}% of indents`,'info',
+      'drillOpen("Placed",filteredData.filter(r=>r._actPlacement))') +
+    kpiCard('🚚','Dispatched',fmtN(dispatched),'',`${pctDisp}% of indents`,'accent',
+      'drillOpen("Dispatched",filteredData.filter(r=>r._dispatch))') +
+    kpiCard('✅','Delivered',fmtN(completed),'',`${pctComp}% — Reporting + Unloading done`,'accent',
       'drillOpen("Completed Shipments",filteredData.filter(r=>r._reporting&&r._unloading))') +
     kpiCard('🚛','In Transit',fmtN(inTransit),'',`Dispatched, not yet reached`,'info',
       'drillOpen("In Transit",filteredData.filter(r=>r._dispatch&&!r._reporting))') +
@@ -1943,7 +2404,7 @@ function renderBottlenecks() {
 function getGroupKey(r) {
   const d = getDateField(r);
   if (!d) return null;
-  if (granularity === 'daily')   return d.toISOString().split('T')[0];
+  if (granularity === 'daily')  return dateKey(d);  // YYYY-MM-DD via normDate, no timezone drift
   if (granularity === 'weekly') {
     const t = new Date(d.getTime());
     const dow = (t.getDay()+6)%7;
@@ -1951,6 +2412,7 @@ function getGroupKey(r) {
     const wk = Math.ceil((t - new Date(t.getFullYear(),0,1))/604800000+1);
     return `${t.getFullYear()}-W${String(wk).padStart(2,'0')}`;
   }
+  if (granularity === 'yearly') return `${d.getFullYear()}`;
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
 }
 
@@ -1961,18 +2423,34 @@ function groupData(data) {
 }
 
 function prettyKey(k) {
-  if (granularity==='daily') { const d=new Date(k); return d.toLocaleDateString('en-IN',{day:'2-digit',month:'short'}); }
+  if (granularity==='daily')  {
+    // Parse YYYY-MM-DD without timezone shift
+    const [y,mo,da] = k.split('-').map(Number);
+    const d = new Date(y, mo-1, da);
+    return d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+  }
   if (granularity==='weekly') return k;
+  if (granularity==='yearly') return k;
   const [y,m]=k.split('-');
   return new Date(y,m-1).toLocaleString('default',{month:'short',year:'2-digit'});
 }
 
 // ════════════════════════════════════════════════════════════
-// TRENDS — including Delivered + Reached
+// TRENDS — Demand, TAT, Detention, Cost, Cost/Wp — all with drill-down on click
 // ════════════════════════════════════════════════════════════
+let _trendGroups = {}, _trendKeys = [];
+
+function drillWithHighlight(title, rows) {
+  drillOpen(title, rows);
+  const card = document.getElementById('drill-card');
+  if (card) { card.style.animation = 'none'; requestAnimationFrame(() => { card.style.animation = 'tableGlow 1.2s ease'; }); }
+}
+
 function renderTrends() {
   const grps = groupData(filteredData);
-  const labels = Object.keys(grps).map(prettyKey);
+  _trendKeys   = Object.keys(grps);
+  _trendGroups = grps;
+  const labels = _trendKeys.map(prettyKey);
   const vals   = Object.values(grps);
 
   makeLineChart('chart-demand', labels, [
@@ -1981,34 +2459,45 @@ function renderTrends() {
     { label:'Dispatched', data: vals.map(g=>g.filter(r=>r._dispatch).length) },
     { label:'Reached',    data: vals.map(g=>g.filter(r=>r._reporting).length) },
     { label:'Delivered',  data: vals.map(g=>g.filter(r=>r._unloading).length) },
-  ]);
+  ], _trendKeys);
 
   makeLineChart('chart-backlog', labels, [
     { label:'Open (Not Placed + Awaiting)', data: vals.map(g=>g.filter(r=>!r._dispatch).length) },
-  ]);
+  ], _trendKeys);
 
   makeLineChart('chart-tat', labels, [
     { label:'Placement Delay', data: vals.map(g=>+safeAvg(g.map(r=>r._placementDelay).filter(v=>v!==null)).toFixed(1)) },
     { label:'Dispatch Delay',  data: vals.map(g=>+safeAvg(g.map(r=>r._dispatchDelay).filter(v=>v!==null)).toFixed(1)) },
     { label:'Transit Time',    data: vals.map(g=>+safeAvg(g.map(r=>r._transitTime).filter(v=>v!==null)).toFixed(1)) },
-  ]);
+  ], _trendKeys);
 
   makeBarChart('chart-detention', labels, [
     { label:'Origin Detention', data: vals.map(g=>safeSum(g.map(r=>r._originDetention))) },
     { label:'Dest. Detention',  data: vals.map(g=>safeSum(g.map(r=>r._destDetention))) },
-  ]);
+  ], _trendKeys);
 
-  makeLineChart('chart-cost', labels, [
-    { label:'Total Freight (₹)', data: vals.map(g=>safeSum(g.map(r=>r._freight))) },
-  ]);
-
-  // Cost per Wp trend
   makeLineChart('chart-costmw', labels, [
     { label:'Avg ₹/Wp', data: vals.map(g => {
       const rows = g.filter(r => r._costPerWp > 0);
       return rows.length ? +safeAvg(rows.map(r => r._costPerWp)).toFixed(4) : 0;
     })},
-  ]);
+  ], _trendKeys);
+
+  // THC trend charts — sum and average using cleaned _thc field
+  makeLineChart('chart-thc-total', labels, [
+    { label:'Total THC (₹)', data: vals.map(g => {
+      const s = safeSum(g.map(r => r._thc).filter(v => v !== null && !isNaN(v)));
+      return s > 0 ? s : 0;
+    })},
+  ], _trendKeys);
+
+  makeLineChart('chart-thc-avg', labels, [
+    { label:'Avg THC/Shipment (₹)', data: vals.map(g => {
+      const valid = g.filter(r => r._thc !== null && !isNaN(r._thc) && r._thc > 0);
+      if (!valid.length) return 0;
+      return +(safeSum(valid.map(r => r._thc)) / valid.length).toFixed(2);
+    })},
+  ], _trendKeys);
 }
 
 // ════════════════════════════════════════════════════════════
@@ -2030,6 +2519,98 @@ function renderDeepDive() {
 
   const csS = cnt(filteredData,'_customer');
   makeCFPieChart('chart-customer', csS.map(([k])=>k), csS.map(([k])=>k), csS.map(([,v])=>v), 'customer');
+
+  // Consignee Pending chart
+  renderConsigneePending();
+}
+
+// ════════════════════════════════════════════════════════════
+// CONSIGNEE PENDING CHARTS (Split into Placement + Unloading)
+// ════════════════════════════════════════════════════════════
+
+// Helper: build a horizontal bar chart for consignee pending
+function buildConsigneeChart(chartId, btnKey, rows, metricLabel, color, drillFn) {
+  const cnCnt = {}, cnRows = {};
+  rows.forEach(r => {
+    const cn = r._consignee ? String(r._consignee).trim() : '';
+    if (!cn || cn.toLowerCase() === 'unknown') return;
+    cnCnt[cn] = (cnCnt[cn] || 0) + 1;
+    if (!cnRows[cn]) cnRows[cn] = [];
+    cnRows[cn].push(r);
+  });
+  const sorted     = Object.entries(cnCnt).sort((a,b)=>b[1]-a[1]).slice(0,15);
+  const displayLbls = sorted.map(([k]) => k.length>30 ? k.slice(0,28)+'…' : k);
+  const rawLbls     = sorted.map(([k]) => k);
+  const vals        = sorted.map(([,v]) => v);
+
+  destroyChart(chartId);
+  const ctx = document.getElementById(chartId);
+  if (!ctx) return;
+
+  const dlCfg = {
+    display: _chartLabelState[chartId] || false,
+    font:{size:9,weight:'600',family:"'Inter',sans-serif"},
+    color:'#0d2420', anchor:'end', align:'end', offset:2,
+    backgroundColor:'rgba(255,255,255,.78)', borderRadius:3,
+    padding:{top:2,bottom:2,left:4,right:4},
+    formatter: v => v.toLocaleString('en-IN')
+  };
+
+  allCharts[chartId] = new Chart(ctx, {
+    type:'bar',
+    data:{ labels:displayLbls, datasets:[{
+      label: metricLabel, data: vals,
+      backgroundColor: color + 'cc', borderColor: color,
+      borderWidth:1, borderRadius:4, datalabels: dlCfg
+    }]},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      indexAxis:'y',
+      plugins:{
+        legend:{display:false},
+        datalabels: dlCfg,
+        tooltip:{callbacks:{
+          title: items => rawLbls[items[0].dataIndex],
+          afterLabel: ctx2 => `  ${((ctx2.parsed.x/(rows.length||1))*100).toFixed(1)}% of total`
+        }}
+      },
+      scales:{
+        x:{grid:{color:'rgba(26,122,110,.1)'},beginAtZero:true,ticks:{font:{size:9}}},
+        y:{grid:{display:false},ticks:{font:{size:10}}}
+      },
+      animation:{duration:500},
+      onClick:(e,els) => {
+        if (!els.length) return;
+        const cn = rawLbls[els[0].index];
+        const drillRows = cnRows[cn] || [];
+        drillWithHighlight(`${metricLabel}: ${cn}`, drillRows);
+      }
+    }
+  });
+}
+
+function renderConsigneePending() {
+  // GRAPH 1: Placement Pending — Indent Date valid AND Act. Placement Date NOT valid
+  const placementPending = filteredData.filter(r =>
+    r._indentDate && !r._actPlacement
+  );
+  buildConsigneeChart(
+    'chart-cn-placement', 'CnPlacement',
+    placementPending,
+    'Placement Pending',
+    '#ff6b6b',
+  );
+
+  // GRAPH 2: Unloading Pending — Actual Reporting exists AND Unloading/Release NOT valid
+  const unloadingPending = filteredData.filter(r =>
+    r._reporting && !r._unloading
+  );
+  buildConsigneeChart(
+    'chart-cn-unloading', 'CnUnloading',
+    unloadingPending,
+    'Unloading Pending',
+    '#ff9f43',
+  );
 }
 
 // ════════════════════════════════════════════════════════════
@@ -2037,38 +2618,108 @@ function renderDeepDive() {
 // ════════════════════════════════════════════════════════════
 function destroyChart(id) { if (allCharts[id]) { try { allCharts[id].destroy(); } catch(e){} delete allCharts[id]; } }
 
-function makeLineChart(id, labels, datasets) {
+function makeLineChart(id, labels, datasets, groupKeys) {
   destroyChart(id);
   const ctx = document.getElementById(id); if (!ctx) return;
+
+  // Pre-compute variance arrays for each dataset
+  const varianceArrays = datasets.map(ds => computeVariance(ds.data || []));
+
+  // Datalabels config based on global toggle
+  const dlCfg = {
+    display: _showDataLabels,
+    font:{size:9,weight:'600',family:"'Inter',sans-serif"},
+    color:'#0d2420', anchor:'top', align:'top', offset:3,
+    backgroundColor:'rgba(255,255,255,.78)', borderRadius:3, padding:{top:2,bottom:2,left:4,right:4},
+    clip: false,
+    formatter:(v) => {
+      if (v===null||v===undefined) return '';
+      if (Math.abs(v)>=1e7) return '₹'+(v/1e7).toFixed(1)+'Cr';
+      if (Math.abs(v)>=1e5) return '₹'+(v/1e5).toFixed(1)+'L';
+      if (Math.abs(v)<1&&v!==0) return v.toFixed(2);   // Cost/Wp: max 2dp
+      return Number(v.toFixed(0)).toLocaleString('en-IN');
+    }
+  };
+
   allCharts[id] = new Chart(ctx, {
     type: 'line',
     data: { labels, datasets: datasets.map((ds,i) => ({
-      ...ds, borderColor:PAL[i], backgroundColor:PAL[i]+'20',
-      fill:false, tension:.4, pointRadius:3, pointHoverRadius:6, borderWidth:2,
+      ...ds,
+      borderColor: i === 0 ? '#26a69a' : i === 1 ? '#FFD700' : PAL[i % PAL.length],
+      backgroundColor: (i === 0 ? '#26a69a' : i === 1 ? '#FFD700' : PAL[i % PAL.length]) + '20',
+      fill:false, tension:.4,
+      pointRadius:3, pointHoverRadius:6, borderWidth:2,
+      datalabels: dlCfg,
     })) },
     options: {
       responsive:true, maintainAspectRatio:false,
-      plugins:{ legend:{labels:{boxWidth:10,padding:14,font:{size:10}}},
-        tooltip:{callbacks:{afterLabel:ctx=>`  ${((ctx.parsed.y/(filteredData.length||1))*100).toFixed(1)}% of total`}} },
-      scales:{ x:{grid:{display:false},ticks:{maxRotation:45,font:{size:9}}}, y:{grid:{color:'rgba(26,122,110,.1)'},beginAtZero:true} },
-      animation:{duration:600}
+      plugins:{
+        legend:{labels:{boxWidth:10,padding:14,font:{size:10}}},
+        datalabels: dlCfg,
+        tooltip:{callbacks:{
+          afterLabel:(ctx2)=>{
+            const va = varianceArrays[ctx2.datasetIndex];
+            if (va && va[ctx2.dataIndex] !== null) {
+              const pct = va[ctx2.dataIndex];
+              return `  Δ vs prev: ${pct > 0 ? '+' : ''}${pct.toFixed(1)}%`;
+            }
+            return '';
+          }
+        }}
+      },
+      scales:{
+        x:{grid:{display:false},ticks:{maxRotation:45,font:{size:9}}},
+        y:{grid:{color:'rgba(26,122,110,.1)'},beginAtZero:true}
+      },
+      animation:{duration:600},
+      onClick:(e,els) => {
+        if (!els.length) return;
+        const key = groupKeys && groupKeys[els[0].index];
+        const rows = key ? filteredData.filter(r => getGroupKey(r) === key)
+                         : filteredData;
+        const metric = datasets[els[0].datasetIndex]?.label || 'Chart';
+        drillWithHighlight(`${metric} — ${labels[els[0].index]}`, rows);
+      }
     }
   });
 }
 
-function makeBarChart(id, labels, datasets) {
+function makeBarChart(id, labels, datasets, groupKeys) {
   destroyChart(id);
   const ctx = document.getElementById(id); if (!ctx) return;
+  const dlCfg = {
+    display: _showDataLabels,
+    font:{size:9,weight:'600',family:"'Inter',sans-serif"},
+    color:'#0d2420', anchor:'end', align:'end', offset:2,
+    backgroundColor:'rgba(255,255,255,.78)', borderRadius:3, padding:{top:2,bottom:2,left:4,right:4},
+    clip: false,
+    formatter:(v) => {
+      if (v===null||v===undefined) return '';
+      if (Math.abs(v)>=1e5) return '₹'+(v/1e5).toFixed(1)+'L';
+      return Number(v.toFixed(0)).toLocaleString('en-IN');
+    }
+  };
   allCharts[id] = new Chart(ctx, {
     type: 'bar',
     data: { labels, datasets: datasets.map((ds,i) => ({
       ...ds, backgroundColor:PAL[i]+'cc', borderColor:PAL[i], borderWidth:1, borderRadius:4,
+      datalabels: dlCfg,
     })) },
     options: {
       responsive:true, maintainAspectRatio:false,
-      plugins:{ legend:{labels:{boxWidth:10,padding:14,font:{size:10}}} },
+      plugins:{
+        legend:{labels:{boxWidth:10,padding:14,font:{size:10}}},
+        datalabels: dlCfg,
+      },
       scales:{ x:{grid:{display:false},ticks:{maxRotation:45,font:{size:9}}}, y:{grid:{color:'rgba(26,122,110,.1)'},beginAtZero:true} },
-      animation:{duration:600}
+      animation:{duration:600},
+      onClick:(e,els) => {
+        if (!els.length) return;
+        const key = groupKeys && groupKeys[els[0].index];
+        const rows = key ? filteredData.filter(r => getGroupKey(r) === key) : filteredData;
+        const metric = datasets[els[0].datasetIndex]?.label || 'Chart';
+        drillWithHighlight(`${metric} — ${labels[els[0].index]}`, rows);
+      }
     }
   });
 }
